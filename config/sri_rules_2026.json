@@ -1,0 +1,58 @@
+{
+  "version": "2026.1",
+  "descripcion": "Parámetros tributarios oficiales del SRI Ecuador para el Régimen RIMPE",
+  "fuentes": [
+    "Resolución NAC-DGERCGC24-00000027",
+    "Resolución NAC-DGERCGC23-00000034",
+    "Ley Orgánica de Eficiencia Económica y Generación de Empleo (R.O. 461)"
+  ],
+  "calendario_noveno_digito": {
+    "1": 10,
+    "2": 12,
+    "3": 14,
+    "4": 16,
+    "5": 18,
+    "6": 20,
+    "7": 22,
+    "8": 24,
+    "9": 26,
+    "0": 28
+  },
+  "meses_declaracion": {
+    "iva_semestre_1": 7,
+    "iva_semestre_2": 1,
+    "renta_rimpe_negocio_popular": 5,
+    "renta_rimpe_emprendedor_natural": 3,
+    "renta_rimpe_emprendedor_sociedad": 4
+  },
+  "tabla_negocio_popular_renta": [
+    { "limite_inferior": 0.00, "limite_superior": 2500.00, "cuota_fija_usd": 0.00 },
+    { "limite_inferior": 2500.01, "limite_superior": 5000.00, "cuota_fija_usd": 5.00 },
+    { "limite_inferior": 5000.01, "limite_superior": 10000.00, "cuota_fija_usd": 15.00 },
+    { "limite_inferior": 10000.01, "limite_superior": 15000.00, "cuota_fija_usd": 35.00 },
+    { "limite_inferior": 15000.01, "limite_superior": 20000.00, "cuota_fija_usd": 60.00 }
+  ],
+  "tabla_emprendedor_renta": [
+    { "limite_inferior": 20000.01, "limite_superior": 50000.00, "impuesto_fraccion_basica": 60.00, "tipo_marginal_porcentaje": 1.00 },
+    { "limite_inferior": 50000.01, "limite_superior": 75000.00, "impuesto_fraccion_basica": 360.00, "tipo_marginal_porcentaje": 1.25 },
+    { "limite_inferior": 75000.01, "limite_superior": 100000.00, "impuesto_fraccion_basica": 672.50, "tipo_marginal_porcentaje": 1.50 },
+    { "limite_inferior": 100000.01, "limite_superior": 200000.00, "impuesto_fraccion_basica": 1047.50, "tipo_marginal_porcentaje": 1.75 },
+    { "limite_inferior": 200000.01, "limite_superior": 300000.00, "impuesto_fraccion_basica": 2797.50, "tipo_marginal_porcentaje": 2.00 }
+  ],
+  "feriados_nacionales_ecuador_fijos": [
+    { "mes": 1, "dia": 1, "nombre": "Año Nuevo" },
+    { "mes": 5, "dia": 1, "nombre": "Día del Trabajo" },
+    { "mes": 5, "dia": 24, "nombre": "Batalla de Pichincha" },
+    { "mes": 8, "dia": 10, "nombre": "Primer Grito de Independencia" },
+    { "mes": 10, "dia": 9, "nombre": "Independencia de Guayaquil" },
+    { "mes": 11, "dia": 2, "nombre": "Día de los Difuntos" },
+    { "mes": 11, "dia": 3, "nombre": "Independencia de Cuenca" },
+    { "mes": 12, "dia": 25, "nombre": "Navidad" }
+  ],
+  "tarifas_generales": {
+    "iva_general": 0.15,
+    "retencion_renta_emprendedor": 0.01,
+    "multa_minima_negocio_popular_sin_impuesto": 15.00,
+    "multa_minima_emprendedor_sin_impuesto": 30.00
+  }
+}
