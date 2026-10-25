@@ -4,10 +4,10 @@
 | :--- | :--- |
 | **Documento** | Diseño y Especificación de Arquitectura de Software (C4 + Flujos) |
 | **Proyecto** | Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE (Caso 11) |
-| **Fase / Semana** | Fase 1 – Semana 1 |
+| **Fase / Semana** | Fase 2 – Semana 2 (MVP Completo Frontend + Backend + RAG) |
 | **Enfoque Arquitectónico** | Arquitectura Híbrida (Motor Determinista + Agente RAG con Salida Estructurada + Compuerta HITL) |
-| **Fecha** | Octubre 2024 |
-| **Versión** | 1.0.0 |
+| **Fecha** | Octubre 2026 / Actualizado Fase 2 |
+| **Versión** | 2.0.0 |
 
 ---
 
@@ -71,15 +71,17 @@ flowchart LR
 
 ---
 
-### 1.2. Backend (FastAPI + Pydantic v2 + LangChain + SQLite/JSON)
-* **Pila Tecnológica:** Python 3.10+, FastAPI, Pydantic v2, LangChain (`langchain-core`, componentes de modelos LLM con soporte de llamada estructurada), Tenacity (reintentos exponenciales con jitter), Uvicorn.
+### 1.2. Backend (FastAPI + Pydantic v2 + Google Gemini Flash + Tenacity)
+* **Pila Tecnológica:** Python 3.10+, FastAPI, Pydantic v2, Google GenAI SDK (`google-genai` / HTTP REST v1beta), Tenacity (reintentos exponenciales 1s, 2s, 4s), Uvicorn.
 * **Módulos Principales del Backend:**
-  1. **Capa de Configuración Paramétrica (`config/sri_rules_2026.json`):** Almacén versionado y desacoplado del código fuente que contiene tarifas de IVA, cuotas progresivas fijas de Negocio Popular (\$0 a \$60 USD), tabla de vencimientos del noveno dígito y catálogo de feriados nacionales ecuatorianos.
-  2. **Motor Determinista de Reglas (`calcular_vencimientos`, `calcular_iva`):** Funciones matemáticas puras que calculan fechas exactas y montos sin intervención de modelos probabilísticos, aplicando traslados automáticos por fines de semana (`calendar.monthrange`) y feriados oficiales.
-  3. **Agente RAG con Salida Estructurada (`generar_recordatorio_validado`):** Enlaza el contexto legal del SRI (proveniente de los 7 PDFs oficiales en `data/raw/`) con un LLM restringido mediante esquema Pydantic (`with_structured_output`), garantizando que la salida contenga campos inmutables: `asunto`, `mensaje_pedagogico`, `formulario_sri`, `articulo_citado` y `advertencia_en_cero`.
-  4. **Manejador de Resiliencia (`Tenacity`):** Estrategia de reintentos exponenciales con fluctuación aleatoria (*jitter*) para manejar límites de tasa (HTTP 429) y desconexiones temporales, con fallback determinista.
-  5. **Compuerta de Envío (*Gatekeeper*):** Endpoint de notificación que aborta con **HTTP 403 Forbidden** si la petición carece de la bandera `confirmado_por_usuario == True`.
-  6. **Flujo Asíncrono / Programado (`scheduler_job.py`):** Tarea en segundo plano (*Background Cron Job*) que escanea vencimientos a $T - 5$ días y genera borradores de notificación para su posterior aprobación por el usuario en la interfaz.
+  1. **Capa de Configuración Paramétrica (`config/sri_rules_2026.json`):** Almacén versionado y desacoplado del código fuente que contiene tarifas de IVA, cuotas progresivas de Negocio Popular ($0 a $60 USD), tabla de vencimientos del noveno dígito y catálogo de feriados nacionales ecuatorianos.
+  2. **Motor Determinista de Reglas (`backend/services/calculator.py`):** Funciones matemáticas puras (`calcular_vencimientos`, `validar_ruc_persona_natural`, `simular_cuota_renta`) que calculan fechas exactas y cuotas sin intervención de modelos probabilísticos, aplicando traslados automáticos por fines de semana y feriados oficiales.
+  3. **Servicio Generativo con Salida Estructurada (`backend/services/llm.py`):** Enlaza el contexto legal del SRI con Google Gemini Flash bajo el esquema estricto Pydantic v2 (`RecordatorioEstructurado`), garantizando cero alucinaciones de fechas y citas textuales de la LRTI y resoluciones vigentes.
+  4. **Manejador de Resiliencia y Fail-Safe (`Tenacity` + Catálogo Determinista):** Estrategia de reintentos exponenciales ante códigos HTTP 429 y 503 con conmutación automática al catálogo determinista oficial del SRI si se agota la cuota externa.
+  5. **Middleware de Observabilidad y Privacidad LOPDP (`backend/middleware/logging_lopdp.py`):** Anonimiza datos personales (RUCs y emails) en los logs e inyecta métricas de latencia de proceso (`X-Process-Time-Ms`).
+  6. **Capa de Routers de Negocio (`backend/routers/`):** Endpoints desacoplados (`obligaciones_router.py` para IA y simulación; `calendario_router.py` para integración con el frontend).
+  7. **Compuerta de Envío (*Gatekeeper HITL*):** Endpoint de notificación que aborta con **HTTP 403 Forbidden** si la petición carece de la bandera `confirmado_por_usuario == True`.
+
 
 ---
 

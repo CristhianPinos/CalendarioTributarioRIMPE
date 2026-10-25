@@ -52,6 +52,9 @@ yarn-error.log*
 pnpm-debug.log*
 .turbo/
 
+# Archivos temporales o locales
+HANDOFF.md
+
 # Variables de entorno y secretos (NUNCA subir a Git)
 .env
 .env.local

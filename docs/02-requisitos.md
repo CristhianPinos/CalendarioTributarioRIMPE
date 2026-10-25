@@ -6,7 +6,7 @@
 | **Proyecto** | Calendario Tributario Inteligente para Emprendedores RIMPE (Caso 11) |
 | **Fase / Semana** | Fase 1 – Semana 1 |
 | **Estado** | Aprobado para Diseño de Arquitectura |
-| **Fecha** | Octubre 2024 |
+| **Fecha** | Octubre 2026 |
 | **Versión** | 1.0.0 |
 
 ---
@@ -389,10 +389,10 @@ erDiagram
   "id": "c1f7a2d4-89b1-4f8e-a812-78d10b71e112",
   "codigo_obligacion": "IVA-SEM-1",
   "nombre_obligacion": "Declaración Semestral de IVA - Primer Semestre",
-  "anio_fiscal": 2024,
+  "anio_fiscal": 2026,
   "periodo": "SEMESTRE_1",
-  "fecha_vencimiento_nominal": "2024-07-24",
-  "fecha_vencimiento_ajustada": "2024-07-24",
+  "fecha_vencimiento_nominal": "2026-07-24",
+  "fecha_vencimiento_ajustada": "2026-07-24",
   "fue_trasladada": false,
   "motivo_traslado": "NINGUNO",
   "estado": "PENDIENTE",
@@ -406,7 +406,7 @@ erDiagram
   "id": "notif-98213-abc",
   "evento_id": "c1f7a2d4-89b1-4f8e-a812-78d10b71e112",
   "destinatario_email": "contacto@emprendedor.ec",
-  "fecha_programada_alerta": "2024-07-17",
+  "fecha_programada_alerta": "2026-07-17",
   "borrador_mensaje": {
     "asunto": "Recordatorio SRI: Tu declaración de IVA vence el 24 de julio",
     "resumen_didactico": "Estimado contribuyente, como estás en RIMPE Emprendedor y tu noveno dígito es 8, debes presentar tu IVA del primer semestre (enero a junio) hasta el 24 de julio.",
