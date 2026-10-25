@@ -7,7 +7,7 @@
 | **Caso / Grupo** | Caso N.º 11 – Grupo 11 |
 | **Tema** | Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE (Agente de obligaciones tributarias con RAG sobre normativa del SRI – Flujo programado de notificaciones) |
 | **Tipo de Producto** | Automatización de proceso con agente y RAG |
-| **Fecha de Elaboración** | Octubre 2024 |
+| **Fecha de Elaboración** | Octubre 2026 |
 | **Versión** | 1.0.0 |
 
 ---

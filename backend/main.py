@@ -12,25 +12,32 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+from backend.middleware.logging_lopdp import LoggingLOPDPMiddleware
+from backend.routers.obligaciones_router import router as obligaciones_router
+from backend.routers.calendario_router import router as calendario_router
+
 # Cargar variables de entorno desde .env si existe
 load_dotenv()
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.0.0"
 PROJECT_NAME = "Calendario Tributario RIMPE"
 
 app = FastAPI(
     title="API Calendario Tributario RIMPE (SRI Ecuador)",
     description=(
         "Backend inteligente para el cálculo determinista de obligaciones tributarias, "
-        "explicaciones normativas con RAG y automatización programada de notificaciones "
-        "con compuerta de confirmación humana (Human-in-the-Loop)."
+        "explicaciones pedagógicas con Google Gemini Flash bajo esquema estructurado, "
+        "y observabilidad conforme a la Ley Orgánica de Protección de Datos Personales (LOPDP)."
     ),
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# Configuración de CORS para permitir la integración con React (Vite / CRA)
+# 1. Middleware de observabilidad y privacidad LOPDP
+app.add_middleware(LoggingLOPDPMiddleware)
+
+# 2. Configuración de CORS para permitir la integración con React (Vite / CRA)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,6 +45,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 3. Inclusión de Routers
+app.include_router(calendario_router)
+app.include_router(obligaciones_router)
+
 
 CONFIG_PATH = Path(os.getenv("SRI_RULES_PATH", "./config/sri_rules_2026.json"))
 
@@ -81,7 +93,7 @@ def health_check():
         "version": APP_VERSION,
         "environment": os.getenv("ENVIRONMENT", "development"),
         "llm_provider": os.getenv("LLM_PROVIDER", "gemini"),
-        "gemini_model": os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+        "gemini_model": os.getenv("GEMINI_MODEL", "gemini-3-flash-preview"),
         "config_loaded": config_ok,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }

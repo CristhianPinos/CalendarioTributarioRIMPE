@@ -7,7 +7,7 @@
 | **Fase / Semana** | Fase 1 – Semana 1 |
 | **Ubicación de Fuentes Crudas** | `data/raw/` (rutas relativas al repositorio) |
 | **Integridad Documental** | 100% Documentos Oficiales Íntegros en Formato PDF Original |
-| **Fecha de Actualización** | Octubre 2024 |
+| **Fecha de Actualización** | Octubre 2026 |
 | **Versión** | 3.0.0 (Cuerpos normativos íntegros en PDF original) |
 
 ---

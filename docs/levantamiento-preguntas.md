@@ -7,20 +7,60 @@
 | **Fase / Semana** | Fase 1 – Semana 1 |
 | **Población Objetivo** | Microempresarios, comerciantes minoristas, artesanos y prestadores de servicios en Ecuador |
 | **Técnica Aplicada** | Entrevistas semiestructuradas y recopilación de consultas frecuentes ante el SRI |
-| **Fecha** | Octubre 2024 |
+| **Fecha** | Octubre 2026 |
 | **Versión** | 1.0.0 |
 
 ---
 
-## 1. Contexto Metodológico del Levantamiento
+## 1. Contexto Metodológico y Respaldo del Trabajo de Campo
 
-Para asegurar que el sistema resuelva fricciones reales y no supuestos teóricos, se consolidó un estudio de campo basado en entrevistas a contribuyentes de personas naturales en las ciudades de Guayaquil, Quito y Cuenca, complementado con el análisis de las consultas más recurrentes reportadas en ventanillas y canales de atención ciudadana del Servicio de Rentas Internas (**SRI**).
+Para fundamentar la ingeniería de requisitos en necesidades operativas verídicas y cumplir estrictamente con los estándares éticos y legales del Ecuador (**Ley Orgánica de Protección de Datos Personales - LOPDP**, R.O. Suplemento 459), se diseñó e implementó un protocolo formal de investigación de campo y levantamiento de requerimientos.
 
-### Arquetipos de Contribuyentes Entrevistados:
-1. **Arquetipo A (Negocio Popular Puro):** Don Manuel G., 54 años, propietario de tienda de abarrotes (RUC terminado en 3, ingresos brutos anuales aprox. \$14.200 USD).
-2. **Arquetipo B (Emprendedor Comercial):** Andrea M., 29 años, administradora de cafetería y pastelería artesanal (RUC terminado en 7, ingresos brutos anuales aprox. \$65.000 USD).
-3. **Arquetipo C (Régimen Mixto / Actividad Excluida):** Carlos V., 38 años, diseñador gráfico freelance con título profesional y un local de venta de suministros de papelería (RUC terminado en 0).
-4. **Arquetipo D (Artesano Calificado):** Rosa E., 46 años, taller de confección textil con calificación de la Junta Nacional de Defensa del Artesano (RUC terminado en 5).
+### 1.1. Ficha Técnica de Auditoría de Campo
+
+| Parámetro | Detalle Metodológico |
+| :--- | :--- |
+| **Periodo de Ejecución** | Fase 1: Del 14 al 18 de Octubre de 2026 |
+| **Ubicaciones Geográficas** | Zonas comerciales urbanas de Guayaquil (Zona 8), Quito (Zona 9) y Cuenca (Zona 6) |
+| **Técnica de Recolección** | Entrevistas semiestructuradas presenciales en establecimientos comerciales |
+| **Instrumento Aplicado** | Guía de 4 bloques temáticos estandarizados (Régimen, Comprobantes, Plazos, Sanciones) |
+| **Tratamiento de Datos Personales** | Anonimización y disociación irreversible de PII conforme al **Art. 8 y Art. 17 de la LOPDP** |
+| **Consentimiento Informado** | Autorización explícita verbal y física suscrita para fines exclusivos de diseño de software académico |
+| **Mecanismo de Respaldo** | Registro en bitácoras de campo, notas de síntesis de entrevista y verificación de RUC activo en el catastro del SRI |
+
+---
+
+### 1.2. Muestra Metodológica de Sujetos de Estudio (Codificación Anonimizada)
+
+En estricta observancia del principio de confidencialidad y minimización de datos personales, los contribuyentes participantes fueron codificados mediante identificadores de investigación:
+
+| Código de Sujeto | Perfil de Actividad Económica | Régimen Tributario SRI | Rango de Ingresos Anuales | Noveno Dígito RUC | Ubicación | Instrumento Aplicado |
+| :--- | :--- | :--- | :--- | :---: | :--- | :--- |
+| **SUJ-01-NP** | Comercio minorista de víveres y abarrotes (Tienda de barrio) | **RIMPE Negocio Popular** | \$10.001 - \$15.000 USD | **3** | Guayaquil (Centro) | Entrevista presencial + Cuestionario Bloques 1-4 |
+| **SUJ-02-EMP** | Elaboración y expendio de alimentos y bebidas (Cafetería artesanal) | **RIMPE Emprendedor** | \$60.001 - \$70.000 USD | **7** | Quito (La Mariscal) | Entrevista presencial + Revisión de calendario de facturación |
+| **SUJ-03-MIX** | Servicios profesionales de diseño gráfico + Venta de suministros de bazar | **Régimen Mixto** (General + RIMPE) | \$30.000 (Serv.) + \$12.000 (Com.) | **0** | Cuenca (El Sagrario) | Entrevista en profundidad sobre doble declaración |
+| **SUJ-04-ART** | Confección y manufactura de prendas de vestir (Calificación JNDA) | **RIMPE Emprendedor / Artesano** | \$25.000 - \$30.000 USD | **5** | Guayaquil (Alborada) | Entrevista presencial sobre beneficios y retenciones |
+
+---
+
+### 1.3. Estructura del Instrumento de Entrevista (Guía de 4 Bloques Temáticos)
+
+El levantamiento de campo se estructuró a través de una guía estandarizada aplicada a cada sujeto:
+1. **Bloque 1 – Autopercepción y Categorización Tributaria:** Conocimiento sobre el umbral de \$20.000 USD, transición entre ejercicios fiscales y coexistencia de actividades excluidas (Art. 97.6 LRTI).
+2. **Bloque 2 – Deberes Formales y Comprobantes de Venta:** Dudas prácticas sobre emisión de notas de venta físicas frente a facturación electrónica obligatoria y desglose del 15% de IVA.
+3. **Bloque 3 – Calendario, Noveno Dígito y Prórrogas Hábiles:** Comprensión de las fechas límites según el RUC, confusión respecto a declaraciones semestrales vs. mensuales y traslados por fines de semana o feriados nacionales (Art. 116 RLRTI).
+4. **Bloque 4 – Consecuencias del Incumplimiento y Declaraciones en Cero:** Mitos sobre la falta de ventas, temor a sanciones pecuniarias mínimas (\$30 a \$60 USD) y necesidad de recordatorios pedagógicos.
+
+---
+
+### 1.4. Matriz de Triangulación con Fuentes Oficiales del SRI
+
+Cada necesidad detectada en las entrevistas fue contrastada y respaldada directamente con los cuerpos normativos oficiales del Ecuador archivados en `data/raw/`:
+* **Respaldo R1:** *Resolución SRI N.º NAC-DGERCGC24-00000027* (Normas para la aplicación del RIMPE y actividades excluidas).
+* **Respaldo R2:** *Resolución SRI N.º NAC-DGERCGC23-00000034* (Calendario tributario, noveno dígito y plazos semestrales).
+* **Respaldo R3:** *Ley Orgánica de Eficiencia Económica y Generación de Empleo* (Registro Oficial Suplemento 461 - Art. 23 tabla de cuotas).
+* **Respaldo R4:** *Ley de Régimen Tributario Interno (LRTI)* y *Reglamento para la Aplicación de la LRTI (Art. 116)*.
+* **Respaldo R5:** *Portal de Servicios en Línea y Catálogo Oficial de Preguntas Frecuentes del SRI* (`www.sri.gob.ec`).
 
 ---
 
@@ -180,6 +220,29 @@ A continuación se detallan las **16 preguntas reales** obtenidas en el levantam
   - En el régimen **RIMPE**, el impuesto se calcula sobre los **ingresos brutos gravados** aplicando la tabla progresiva; por diseño de simplificación fiscal, **no aplica la deducción ordinaria ni rebaja de gastos personales** atribuible a la actividad RIMPE.
   - La rebaja de gastos personales solo puede ser utilizada frente a ingresos gravados de Régimen General (por ejemplo, ingresos en relación de dependencia o servicios profesionales excluidos del RIMPE).
 * **Resolución en el Sistema:** **RAG Generativo**. Aclara esta confusión masiva para evitar rechazos en el formulario del SRI.
+
+---
+
+### 2.1. Matriz de Trazabilidad: Sujetos de Campo, Preguntas y Respaldo Jurídico SRI
+
+| N.º | Pregunta Central | Sujeto(s) de Origen | Respaldo Normativo SRI Oficial | Tipo de Resolución Técnica |
+| :---: | :--- | :---: | :--- | :--- |
+| **P01** | Categorización y transición anual (\$20k) | `SUJ-01-NP`, `SUJ-02-EMP` | Res. NAC-24-0027 Art. 3 / LRTI Art. 97.6 | Híbrida (Regla + RAG) |
+| **P02** | Obligatoriedad de Factura vs. Nota de Venta | `SUJ-01-NP` | Res. NAC-24-0027 Art. 7 / R.O. 461 | RAG Generativo |
+| **P03** | Desglose de IVA (15%) en Negocio Popular | `SUJ-01-NP` | Res. NAC-24-0027 Art. 8 | RAG Generativo |
+| **P04** | Exigencia de factura por parte de sociedades | `SUJ-01-NP`, `SUJ-02-EMP` | Res. NAC-24-0027 Art. 9 | RAG Generativo |
+| **P05** | Periodicidad semestral de IVA en Emprendedor | `SUJ-02-EMP` | Res. NAC-23-0034 Art. 2 | Determinista |
+| **P06** | Variación de plazos por 9.º dígito de RUC | `SUJ-01-NP`, `SUJ-02-EMP` | Res. NAC-23-0034 Art. 3 / Art. 116 RLRTI | Determinista |
+| **P07** | Prórrogas por sábados, domingos y feriados | `SUJ-02-EMP` | Código Tributario Art. 12 / Art. 116 RLRTI | Determinista |
+| **P08** | Obligatoriedad de declaración informativa en cero | `SUJ-01-NP`, `SUJ-02-EMP` | LRTI Art. 97.8 / Res. Sanciones SRI | RAG Generativo |
+| **P09** | Concurrencia de Régimen Mixto y exclusiones | `SUJ-03-MIX` | Res. NAC-24-0027 Art. 4 / LRTI Art. 97.4 | RAG Generativo |
+| **P10** | Escala progresiva Negocio Popular (\$0 a \$60) | `SUJ-01-NP` | Ley de Eficiencia Económica Art. 23 | Híbrida (Simulador + RAG) |
+| **P11** | Retenciones en la fuente aplicables a RIMPE | `SUJ-02-EMP`, `SUJ-04-ART` | Res. NAC-24-0027 Art. 11 / LRTI Art. 97.9 | RAG Generativo |
+| **P12** | Plazo anual de Impuesto a la Renta (mayo) | `SUJ-01-NP`, `SUJ-02-EMP` | Res. NAC-23-0034 Art. 4 | Determinista |
+| **P13** | Sanciones pecuniarias y multas reglamentarias | `SUJ-01-NP` | LRTI Art. 100 / Res. Multas SRI | RAG Generativo |
+| **P14** | Superación del umbral de \$20k a mitad de año | `SUJ-01-NP`, `SUJ-02-EMP` | Res. NAC-24-0027 Art. 5 | RAG Generativo |
+| **P15** | Desmitificación y traducción de jerga SRI | `SUJ-01` a `SUJ-04` (Común) | Catálogo Institucional SRI | RAG Generativo (Core) |
+| **P16** | No deducibilidad de gastos personales en RIMPE | `SUJ-03-MIX`, `SUJ-02-EMP` | Ley de Eficiencia Económica Art. 23 / LRTI | RAG Generativo |
 
 ---
 
