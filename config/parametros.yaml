@@ -1,0 +1,174 @@
+# ==============================================================================
+# Parámetros Oficiales del SRI Ecuador y Configuración del Negocio (Ejercicio Fiscal 2026)
+# Asignatura: Ingeniería de Software con IA Generativa
+# Caso N.º 11 – Grupo 11: Calendario Tributario RIMPE
+# ==============================================================================
+# Cumplimiento estricto de la Lista de Verificación (Checklist Entrega 3):
+# "Parámetros en config/: Tarifas, umbrales, salario básico o calendarios: nunca en el código ni en el prompt."
+# ==============================================================================
+
+version: "2026.1"
+descripcion: "Parámetros tributarios oficiales del SRI Ecuador para el Régimen RIMPE y configuración del Agente"
+
+fuentes_legales:
+  - "Ley de Régimen Tributario Interno (LRTI) codificada vigente - Arts. 97.1 al 97.10"
+  - "Reglamento para la Aplicación de la LRTI (RLRTI) - Art. 217"
+  - "Resolución SRI NAC-DGERCGC24-00000027 (Normas para la aplicación del RIMPE)"
+  - "Resolución SRI NAC-DGERCGC23-00000034 (Calendario tributario de vencimientos por noveno dígito)"
+  - "Ley Orgánica de Eficiencia Económica y Generación de Empleo (Registro Oficial Suplemento 461) - Tabla Art. 23"
+  - "Ley Orgánica para Enfrentar el Conflicto Armado Interno (Tarifa General de IVA 15%)"
+
+# ------------------------------------------------------------------------------
+# 1. PARÁMETROS ECONÓMICOS Y LABORALES VIGENTES
+# ------------------------------------------------------------------------------
+parametros_economicos:
+  anio_fiscal: 2026
+  salario_basico_unificado_usd: 460.00
+  fraccion_basica_desgravada_ir_general_usd: 11902.00
+  moneda: "USD"
+
+# ------------------------------------------------------------------------------
+# 2. UMBRALES DE CATEGORIZACIÓN RIMPE (Art. 97.3 LRTI)
+# ------------------------------------------------------------------------------
+umbrales_rimpe:
+  negocio_popular:
+    ingreso_minimo_usd: 0.00
+    ingreso_maximo_usd: 20000.00
+    descripcion: "Personas naturales con ingresos brutos anuales de hasta $20,000 USD al 31 de diciembre del año anterior."
+  emprendedor:
+    ingreso_minimo_usd: 20000.01
+    ingreso_maximo_usd: 300000.00
+    descripcion: "Personas naturales y jurídicas con ingresos brutos anuales de entre $20,000.01 y $300,000 USD."
+  regimen_general_exclusion:
+    ingreso_minimo_usd: 300000.01
+    descripcion: "Contribuyentes cuyos ingresos exceden $300,000 USD o realizan actividades excluidas del Art. 97.4 LRTI."
+
+# ------------------------------------------------------------------------------
+# 3. TARIFAS DE IVA OFICIALES EN ECUADOR (Art. 55 y Art. 65 LRTI)
+# ------------------------------------------------------------------------------
+tarifas_iva:
+  general: 0.15                  # Tarifa general vigente (15%)
+  materiales_construccion: 0.05  # Tarifa diferenciada para materiales de construcción (5%)
+  turismo_feriados: 0.08         # Tarifa reducida en feriados nacionales para sector turístico (8%)
+  tarifa_cero: 0.00              # Bienes y servicios gravados con tarifa 0%
+  tarifa_vigente_defecto: 0.15   # Tarifa por defecto para la herramienta calcular_iva
+
+# ------------------------------------------------------------------------------
+# 4. CALENDARIO OFICIAL DE VENCIMIENTOS POR NOVENO DÍGITO (Res. NAC-23-0034)
+# ------------------------------------------------------------------------------
+calendario_noveno_digito:
+  "1": 10
+  "2": 12
+  "3": 14
+  "4": 16
+  "5": 18
+  "6": 20
+  "7": 22
+  "8": 24
+  "9": 26
+  "0": 28
+
+meses_declaracion:
+  iva_semestre_1: 7                       # Julio (Período Enero - Junio)
+  iva_semestre_2: 1                       # Enero del año siguiente (Período Julio - Diciembre)
+  renta_rimpe_negocio_popular: 5          # Mayo del año siguiente
+  renta_rimpe_emprendedor_natural: 3      # Marzo del año siguiente
+  renta_rimpe_emprendedor_sociedad: 4     # Abril del año siguiente
+
+# ------------------------------------------------------------------------------
+# 5. TABLAS PROGRESIVAS DE IMPUESTO A LA RENTA RIMPE (Ley Eficiencia Económica)
+# ------------------------------------------------------------------------------
+tabla_negocio_popular_renta:
+  - limite_inferior: 0.00
+    limite_superior: 2500.00
+    cuota_fija_usd: 0.00
+  - limite_inferior: 2500.01
+    limite_superior: 5000.00
+    cuota_fija_usd: 5.00
+  - limite_inferior: 5000.01
+    limite_superior: 10000.00
+    cuota_fija_usd: 15.00
+  - limite_inferior: 10000.01
+    limite_superior: 15000.00
+    cuota_fija_usd: 35.00
+  - limite_inferior: 15000.01
+    limite_superior: 20000.00
+    cuota_fija_usd: 60.00
+
+tabla_emprendedor_renta:
+  - limite_inferior: 20000.01
+    limite_superior: 50000.00
+    impuesto_fraccion_basica: 60.00
+    tipo_marginal_porcentaje: 1.00
+  - limite_inferior: 50000.01
+    limite_superior: 75000.00
+    impuesto_fraccion_basica: 360.00
+    tipo_marginal_porcentaje: 1.25
+  - limite_inferior: 75000.01
+    limite_superior: 100000.00
+    impuesto_fraccion_basica: 672.50
+    tipo_marginal_porcentaje: 1.50
+  - limite_inferior: 100000.01
+    limite_superior: 200000.00
+    impuesto_fraccion_basica: 1047.50
+    tipo_marginal_porcentaje: 1.75
+  - limite_inferior: 200000.01
+    limite_superior: 300000.00
+    impuesto_fraccion_basica: 2797.50
+    tipo_marginal_porcentaje: 2.00
+
+# ------------------------------------------------------------------------------
+# 6. FERIADOS NACIONALES OFICIALES DE ECUADOR 2026 (Ley Orgánica del Servicio Público)
+# Si cae en fin de semana o feriado, el vencimiento se traslada al primer día hábil siguiente (Código Tributario Art. 12)
+# ------------------------------------------------------------------------------
+feriados_nacionales_ecuador_2026:
+  - mes: 1
+    dia: 1
+    nombre: "Año Nuevo"
+  - mes: 2
+    dia: 16
+    nombre: "Carnaval (Lunes)"
+  - mes: 2
+    dia: 17
+    nombre: "Carnaval (Martes)"
+  - mes: 4
+    dia: 3
+    nombre: "Viernes Santo"
+  - mes: 5
+    dia: 1
+    nombre: "Día del Trabajo"
+  - mes: 5
+    dia: 24
+    nombre: "Batalla de Pichincha"
+  - mes: 8
+    dia: 10
+    nombre: "Primer Grito de Independencia"
+  - mes: 10
+    dia: 9
+    nombre: "Independencia de Guayaquil"
+  - mes: 11
+    dia: 2
+    nombre: "Día de los Difuntos"
+  - mes: 11
+    dia: 3
+    nombre: "Independencia de Cuenca"
+  - mes: 12
+    dia: 25
+    nombre: "Navidad"
+
+# ------------------------------------------------------------------------------
+# 7. PARÁMETROS OPERATIVOS DEL AGENTE Y DE LA CINTA AUTOMATIZADA
+# ------------------------------------------------------------------------------
+agente_y_flujo:
+  umbral_confianza_clasificacion: 0.85      # Determinado con 0 errores silenciosos en el taller
+  dias_anticipacion_alerta_diaria: 5        # Tarea programada busca vencimientos en los próximos 5 días hábiles
+  max_iteraciones_agente: 5                 # Límite estricto de llamadas a herramientas para evitar loops
+  requiere_confirmacion_humana: true        # Enviar recordatorio es irreversible: requiere HITL
+  canales_permitidos:
+    - "email"
+    - "consola"
+
+observabilidad_lopdp:
+  anonimizar_ruc: true                      # Enmascarar primeros dígitos (Art. 8 y 17 LOPDP)
+  anonimizar_email: true
+  nivel_log: "INFO"

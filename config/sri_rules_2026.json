@@ -1,11 +1,31 @@
 {
   "version": "2026.1",
-  "descripcion": "Parámetros tributarios oficiales del SRI Ecuador para el Régimen RIMPE",
+  "descripcion": "Parámetros tributarios oficiales del SRI Ecuador para el Régimen RIMPE y configuración del Agente",
   "fuentes": [
+    "Ley de Régimen Tributario Interno (LRTI) codificada vigente - Arts. 97.1 al 97.10",
+    "Reglamento para la Aplicación de la LRTI (RLRTI) - Art. 217",
     "Resolución NAC-DGERCGC24-00000027",
     "Resolución NAC-DGERCGC23-00000034",
     "Ley Orgánica de Eficiencia Económica y Generación de Empleo (R.O. 461)"
   ],
+  "parametros_economicos": {
+    "anio_fiscal": 2026,
+    "salario_basico_unificado_usd": 460.00,
+    "fraccion_basica_desgravada_ir_general_usd": 11902.00,
+    "moneda": "USD"
+  },
+  "umbrales_rimpe": {
+    "negocio_popular_max_usd": 20000.00,
+    "emprendedor_max_usd": 300000.00,
+    "excluido_min_usd": 300000.01
+  },
+  "tarifas_iva": {
+    "general": 0.15,
+    "materiales_construccion": 0.05,
+    "turismo_feriados": 0.08,
+    "tarifa_cero": 0.00,
+    "tarifa_vigente_defecto": 0.15
+  },
   "calendario_noveno_digito": {
     "1": 10,
     "2": 12,
@@ -41,6 +61,9 @@
   ],
   "feriados_nacionales_ecuador_fijos": [
     { "mes": 1, "dia": 1, "nombre": "Año Nuevo" },
+    { "mes": 2, "dia": 16, "nombre": "Carnaval (Lunes)" },
+    { "mes": 2, "dia": 17, "nombre": "Carnaval (Martes)" },
+    { "mes": 4, "dia": 3, "nombre": "Viernes Santo" },
     { "mes": 5, "dia": 1, "nombre": "Día del Trabajo" },
     { "mes": 5, "dia": 24, "nombre": "Batalla de Pichincha" },
     { "mes": 8, "dia": 10, "nombre": "Primer Grito de Independencia" },
@@ -54,5 +77,11 @@
     "retencion_renta_emprendedor": 0.01,
     "multa_minima_negocio_popular_sin_impuesto": 15.00,
     "multa_minima_emprendedor_sin_impuesto": 30.00
+  },
+  "agente_y_flujo": {
+    "umbral_confianza_clasificacion": 0.85,
+    "dias_anticipacion_alerta_diaria": 5,
+    "max_iteraciones_agente": 5,
+    "requiere_confirmacion_humana": true
   }
 }

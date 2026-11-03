@@ -1,0 +1,44 @@
+[
+  {
+    "id_recordatorio": "REC-8-0923-IVA_SEMESTRAL_1-20260724",
+    "ruc": "0923456784001",
+    "razon_social": "Comercial Pinos & Asociados",
+    "email": "cristhian.pinos@empresa.ec",
+    "tipo_regimen": "RIMPE_EMPRENDEDOR",
+    "codigo_obligacion": "IVA_SEMESTRAL_1",
+    "titulo_obligacion": "Declaración Semestral de IVA (Semestre 1: Ene - Jun)",
+    "fecha_vencimiento": "2026-07-24",
+    "dias_restantes": 4,
+    "asunto": "Recordatorio Tributario SRI: Declaración Semestral de IVA (2026-07-24)",
+    "cuerpo_recordatorio": "Estimado(a) Comercial Pinos & Asociados (RUC: 0923****001),\n\nLe informamos que de acuerdo al calendario tributario oficial del SRI, su obligación 'IVA_SEMESTRAL_1' correspondiente al Régimen RIMPE_EMPRENDEDOR vence el próximo 2026-07-24.\n\nRecuerde que si no registró ventas ni compras en este período, debe presentar su declaración informativa en cero para evitar sanciones del SRI.\n\nBase Legal y Citas Obligatorias:\n[LRTI, Art. 97.6]\n\nNota: Este mensaje ha sido redactado por el Asistente Inteligente RIMPE y requiere su confirmación antes de registrarse en la bitácora de despachos oficiales.",
+    "citas_normativas": [
+      "[LRTI, Art. 97.6]"
+    ],
+    "estado": "ENVIADO",
+    "fecha_generacion": "2026-10-30T22:07:14.218223+00:00",
+    "fecha_envio": "2026-10-30T22:07:14.236857+00:00",
+    "id_auditoria_envio": "AUD-DISPATCH-1793398034",
+    "usuario_confirmador": "auditor_test"
+  },
+  {
+    "id_recordatorio": "REC-8-0923-IVA_REGIMEN_GENERAL_MIXTO-20260724",
+    "ruc": "0923456784001",
+    "razon_social": "Comercial Pinos & Asociados",
+    "email": "cristhian.pinos@empresa.ec",
+    "tipo_regimen": "RIMPE_EMPRENDEDOR",
+    "codigo_obligacion": "IVA_REGIMEN_GENERAL_MIXTO",
+    "titulo_obligacion": "Declaración de IVA - Actividades Excluidas (Régimen General)",
+    "fecha_vencimiento": "2026-07-24",
+    "dias_restantes": 4,
+    "asunto": "Recordatorio Tributario SRI: Declaración Semestral de IVA (2026-07-24)",
+    "cuerpo_recordatorio": "Estimado(a) Comercial Pinos & Asociados (RUC: 0923****001),\n\nLe informamos que de acuerdo al calendario tributario oficial del SRI, su obligación 'IVA_REGIMEN_GENERAL_MIXTO' correspondiente al Régimen RIMPE_EMPRENDEDOR vence el próximo 2026-07-24.\n\nRecuerde que si no registró ventas ni compras en este período, debe presentar su declaración informativa en cero para evitar sanciones del SRI.\n\nBase Legal y Citas Obligatorias:\n[LRTI, Art. 97.6]\n\nNota: Este mensaje ha sido redactado por el Asistente Inteligente RIMPE y requiere su confirmación antes de registrarse en la bitácora de despachos oficiales.",
+    "citas_normativas": [
+      "[LRTI, Art. 97.6]"
+    ],
+    "estado": "ENVIADO",
+    "fecha_generacion": "2026-10-30T22:07:14.233264+00:00",
+    "fecha_envio": "2026-10-30T22:07:22.836474+00:00",
+    "id_auditoria_envio": "AUD-DISPATCH-1793398042",
+    "usuario_confirmador": "auditor_test"
+  }
+]

@@ -56,12 +56,19 @@ def validar_ruc_persona_natural(ruc: str) -> bool:
 
 
 def cargar_reglas_sri(config_path: Optional[str] = None) -> Dict[str, Any]:
-    """Carga y valida el archivo de parámetros tributarios desacoplado."""
-    path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
+    """Carga y valida el archivo de parámetros tributarios desacoplado (YAML o JSON)."""
+    if not config_path:
+        from backend.services.config_loader import load_parametros
+        return load_parametros()
+
+    path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Archivo de reglas SRI no encontrado en: {path}")
 
     with open(path, "r", encoding="utf-8") as f:
+        if path.suffix in [".yaml", ".yml"]:
+            import yaml
+            return yaml.safe_load(f)
         return json.load(f)
 
 
@@ -135,7 +142,7 @@ def calcular_vencimientos(
     if dia_base is None:
         raise ValueError(f"No existe día base configurado para el noveno dígito '{noveno_digito_str}'")
 
-    feriados = reglas.get("feriados_nacionales_ecuador_fijos", [])
+    feriados = reglas.get("feriados_nacionales_ecuador_2026") or reglas.get("feriados_nacionales_ecuador_fijos", [])
     eventos: List[Dict[str, Any]] = []
 
     # ==========================================
