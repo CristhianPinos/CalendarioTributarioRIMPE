@@ -11,27 +11,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clonar repositorio
-        uses: actions/checkout@v4
+    - name: Clonar repositorio
+      uses: actions/checkout@v4
 
-      - name: Configurar Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+    - name: Configurar Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
 
-      - name: Instalar dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+    - name: Configurar Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: "npm"
+        cache-dependency-path: frontend/package-lock.json
 
-      - name: Ejecutar todas las pruebas del backend
-        env:
-          GEMINI_API_KEY: "dummy-key-para-ci"
-        run: |
-          python -m pytest backend/tests/ -q
+    - name: Instalar dependencias del frontend
+      working-directory: frontend
+      run: npm ci
 
-      - name: Ejecutar evaluación formal de calidad y RAG
-        env:
-          GEMINI_API_KEY: "dummy-key-para-ci"
-        run: |
-          python eval/run_eval.py
+    - name: Compilar frontend de producción
+      working-directory: frontend
+      run: npm run build
+
+    - name: Instalar dependencias del backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+
+    - name: Ejecutar todas las pruebas del backend
+      env:
+        GEMINI_API_KEY: "dummy-key-para-ci"
+      run: |
+        python -m pytest backend/tests/ -q
+
+    - name: Ejecutar evaluación formal de calidad y RAG
+      env:
+        GEMINI_API_KEY: "dummy-key-para-ci"
+      run: |
+        python eval/run_eval.py
