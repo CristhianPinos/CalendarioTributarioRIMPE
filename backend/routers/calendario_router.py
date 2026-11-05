@@ -135,4 +135,4 @@ async def endpoint_validar_ruc(request: ValidacionRucRequest) -> ValidacionRucRe
 async def endpoint_listar_feriados() -> List[Dict[str, Any]]:
     """Retorna la lista de feriados nacionales cargados desde el archivo de configuración desacoplado."""
     reglas = cargar_reglas_sri()
-    return reglas.get("feriados_nacionales_ecuador_fijos", [])
+    return reglas.get("feriados_nacionales_ecuador_2026") or reglas.get("feriados_nacionales_ecuador_fijos", [])

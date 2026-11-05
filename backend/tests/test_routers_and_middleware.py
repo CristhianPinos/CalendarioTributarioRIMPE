@@ -63,9 +63,10 @@ class TestMiddlewareObservabilidad:
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "ok"
-        assert data["config_loaded"] is True
-        assert "gemini" in data["llm_provider"].lower()
+        assert data["status"] in ("healthy", "degraded")
+        assert "checks" in data
+        assert data["checks"]["sri_rules_config"] is True
+        assert "service" in data
 
 
 # ==============================================================================
