@@ -22,7 +22,7 @@ import {
   ExternalLink,
   Lock,
 } from "lucide-react";
-import { obtenerExplicacion } from "../services/apiClient";
+import { obtenerExplicacion, ejecutarAgente } from "../services/apiClient";
 
 export default function ExplanationModal({
   isOpen,
@@ -35,11 +35,12 @@ export default function ExplanationModal({
   const [explicacionData, setExplicacionData] = useState(null);
   const [esDeclaracionEnCero, setEsDeclaracionEnCero] = useState(false);
 
-  // Estados de la Compuerta HITL (Human-in-the-Loop)
+  // Estados de la Compuerta HITL (Human-in-the-Loop) y Agente Autónomo
   const [confirmadoPorUsuario, setConfirmadoPorUsuario] = useState(false);
   const [emailDestino, setEmailDestino] = useState(perfil?.email || "");
   const [recordatorioProgramado, setRecordatorioProgramado] = useState(false);
   const [enviandoHitl, setEnviandoHitl] = useState(false);
+  const [resultadoAgente, setResultadoAgente] = useState(null);
 
   // Cargar explicación cada vez que se abre el modal con una nueva obligación
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function ExplanationModal({
       setError(null);
       setRecordatorioProgramado(false);
       setConfirmadoPorUsuario(false);
+      setResultadoAgente(null);
       return;
     }
 
@@ -97,16 +99,38 @@ export default function ExplanationModal({
     }
   };
 
-  const handleProgramarRecordatorio = (e) => {
+  const handleProgramarRecordatorio = async (e) => {
     e.preventDefault();
     if (!confirmadoPorUsuario) return;
 
     setEnviandoHitl(true);
-    // Simulación de envío a través de la compuerta HITL
-    setTimeout(() => {
-      setEnviandoHitl(false);
+    setError(null);
+
+    try {
+      // Conexión real con el Agente Autónomo ReAct (/api/agente/ejecutar)
+      const res = await ejecutarAgente({
+        instruccion: `Calcular obligaciones, redactar y formalizar despacho para la obligación ${obligacion.codigo_obligacion}`,
+        perfil: {
+          ruc: perfil?.ruc || "0923456784001",
+          razon_social: perfil?.razon_social || "Contribuyente RIMPE",
+          tipo_regimen: perfil?.tipo_regimen || "RIMPE_EMPRENDEDOR",
+          email: emailDestino,
+          anio: perfil?.anio || 2026,
+          tiene_actividades_excluidas: Boolean(perfil?.tiene_actividades_excluidas),
+        },
+        base_imponible_iva: obligacion.codigo_obligacion?.includes("IVA") ? 1000.0 : null,
+        confirmacion_envio: true, // Compuerta HITL aprobada por el usuario
+      });
+
+      setResultadoAgente(res.data);
       setRecordatorioProgramado(true);
-    }, 700);
+    } catch (err) {
+      setError(
+        err.message || "No se pudo procesar la ejecución del agente tributario."
+      );
+    } finally {
+      setEnviandoHitl(false);
+    }
   };
 
   if (!isOpen || !obligacion) return null;
@@ -131,7 +155,7 @@ export default function ExplanationModal({
         <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 p-6 text-white relative flex-shrink-0">
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="absolute top-5 right-5 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
             title="Cerrar modal (Esc)"
           >
             <X className="w-5 h-5" />
@@ -207,11 +231,11 @@ export default function ExplanationModal({
               <div className="mt-3 pt-3 border-t border-emerald-200 text-xs space-y-2 animate-in fade-in duration-150">
                 <div className="flex items-start space-x-2 text-emerald-900 font-bold">
                   <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                  <span>¿Es obligatorio declarar si no vendí nada? SÍ, 100% OBLIGATORIO.</span>
+                  <span>¿Es obligatorio declarar si no vendí nada? Sí, 100% OBLIGATORIO.</span>
                 </div>
                 <p className="text-emerald-800 text-[11px] leading-relaxed pl-6">
-                  Muchos emprendedores creen erróneamente que sin ventas no deben ingresar al sistema. 
-                  En Ecuador, no declarar a tiempo genera una <strong>multa automática del SRI de $30 a $60 USD</strong> (Art. 100 LRTI), 
+                  Muchos emprendedores creen erróneamente que sin ventas no deben ingresar al sistema.
+                  En Ecuador, no declarar a tiempo genera una <strong>multa automática del SRI de $30 a $60 USD</strong> (Art. 100 LRTI),
                   aunque el valor final a pagar de impuesto sea $0.00.
                 </p>
                 <div className="bg-white/80 rounded-xl p-2.5 border border-emerald-200/80 text-[11px] text-slate-700 space-y-1">
@@ -229,122 +253,100 @@ export default function ExplanationModal({
             )}
           </div>
 
-          {/* Estado de Carga con IA */}
-          {cargando && (
+          {cargando ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-3">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-full border-4 border-blue-200 border-t-blue-700 animate-spin" />
-                <Sparkles className="w-5 h-5 text-amber-500 absolute inset-0 m-auto animate-pulse" />
-              </div>
-              <p className="text-sm font-semibold text-slate-700">
-                Consultando normativa oficial del SRI con Google Gemini Flash...
-              </p>
-              <p className="text-xs text-slate-400">
-                Generando explicación didáctica estructurada y citas jurídicas
+              <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-slate-500 font-medium">
+                Consultando base legal RAG y generando explicación didáctica...
               </p>
             </div>
-          )}
-
-          {/* Estado de Error */}
-          {!cargando && error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 space-y-2">
-              <div className="flex items-center space-x-2 font-bold">
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-                <span>Error al obtener la explicación generativa</span>
+          ) : error ? (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-start space-x-3">
+              <AlertTriangle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-bold">Error al procesar</p>
+                <p className="text-[11px] mt-0.5">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => cargarExplicacion(esDeclaracionEnCero)}
+                  className="mt-2 text-rose-700 underline font-semibold flex items-center space-x-1 cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Reintentar consulta</span>
+                </button>
               </div>
-              <p>{error}</p>
-              <button
-                onClick={() => cargarExplicacion(esDeclaracionEnCero)}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Reintentar Consulta</span>
-              </button>
             </div>
-          )}
-
-          {/* Contenido Explicativo Estructurado */}
-          {!cargando && recordatorio && (
-            <div className="space-y-4">
-              {/* Badge del Modelo / Fuente */}
-              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-100">
-                <span className="inline-flex items-center text-indigo-700 font-semibold bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
-                  <Sparkles className="w-3.5 h-3.5 mr-1 text-indigo-600" />
-                  {esFallback
-                    ? "Catálogo Oficial SRI (Contingencia)"
-                    : `Google Gemini Flash (${modeloTexto})`}
-                </span>
-                {tiempoTexto && (
-                  <span className="text-slate-400 text-[11px]">
-                    Latencia: {tiempoTexto}s
-                  </span>
-                )}
-              </div>
-
+          ) : recordatorio ? (
+            <div className="space-y-4 text-xs">
               {/* 1. Resumen Didáctico */}
-              <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4">
-                <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-1.5 flex items-center">
-                  <BookOpen className="w-4 h-4 mr-1.5 text-blue-700" />
-                  ¿En qué consiste esta obligación?
-                </h4>
-                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-                  {recordatorio.explicacion_sencilla || recordatorio.resumen_didactico}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center space-x-2 text-slate-800 font-bold mb-2">
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  <span className="uppercase text-[11px] tracking-wider">Resumen Explicativo</span>
+                </div>
+                <p className="text-slate-600 leading-relaxed text-xs">
+                  {recordatorio.resumen_didactico}
                 </p>
               </div>
 
-              {/* 2. Grid de Formulario / Canal y Comprobantes / Sugerencia */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5">
-                  <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1 flex items-center">
-                    <FileText className="w-3.5 h-3.5 mr-1.5 text-blue-700" />
-                    Canal y Formulario Oficial
-                  </h5>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {recordatorio.canal_recomendado || recordatorio.formulario_sri || obligacion.formulario_sri}
-                  </p>
+              {/* 2. Requisitos y Comprobantes Válidos */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center space-x-2 text-slate-800 font-bold mb-2">
+                  <Receipt className="w-4 h-4 text-emerald-600" />
+                  <span className="uppercase text-[11px] tracking-wider">Comprobantes y Documentos Válidos</span>
                 </div>
-
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5">
-                  <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1 flex items-center">
-                    <Receipt className="w-3.5 h-3.5 mr-1.5 text-emerald-700" />
-                    Paso a Paso Recomendado
-                  </h5>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {recordatorio.sugerencia_accion || recordatorio.comprobantes_validos || "Cumplir dentro del plazo establecido en el portal SRI en Línea."}
-                  </p>
-                </div>
-              </div>
-
-              {/* 3. Consecuencias por Incumplimiento o Multas */}
-              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3.5">
-                <h5 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center">
-                  <AlertTriangle className="w-3.5 h-3.5 mr-1.5 text-amber-700" />
-                  Consecuencias por Incumplimiento o Declaración Tardía
-                </h5>
-                <p className="text-xs text-amber-900/90 leading-relaxed">
-                  {recordatorio.consecuencia_incumplimiento || recordatorio.advertencia_en_cero}
+                <p className="text-slate-600 leading-relaxed text-xs">
+                  {recordatorio.comprobantes_validos}
                 </p>
               </div>
 
-              {/* 4. Base Legal y Consejo Práctico */}
-              <div className="space-y-2">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs text-slate-600 flex items-start space-x-2">
-                  <Scale className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-slate-800 block">Base Legal Oficial:</strong>
-                    <span>{recordatorio.base_legal_oficial}</span>
-                  </div>
+              {/* 3. Base Legal Oficial y Citas */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center space-x-2 text-slate-800 font-bold mb-2">
+                  <Scale className="w-4 h-4 text-indigo-600" />
+                  <span className="uppercase text-[11px] tracking-wider">Base Legal y Fundamentación SRI</span>
                 </div>
+                <p className="text-slate-600 font-mono text-[11px] bg-white p-2.5 rounded-xl border border-slate-200/80 leading-relaxed">
+                  {recordatorio.base_legal_oficial}
+                </p>
+              </div>
 
-                {recordatorio.consejo_practico && (
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/70 text-xs text-emerald-800 flex items-start space-x-2">
-                    <Lightbulb className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="block text-emerald-950">Consejo Práctico:</strong>
-                      <span>{recordatorio.consejo_practico}</span>
-                    </div>
+              {/* 4. Sugerencia de Acción y Canal */}
+              <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4">
+                <div className="flex items-center space-x-2 text-blue-900 font-bold mb-2">
+                  <Lightbulb className="w-4 h-4 text-amber-500" />
+                  <span className="uppercase text-[11px] tracking-wider">Sugerencia de Acción</span>
+                </div>
+                <p className="text-blue-900 text-xs leading-relaxed mb-2">
+                  {recordatorio.sugerencia_accion}
+                </p>
+                {recordatorio.canal_recomendado && (
+                  <div className="flex items-center space-x-1.5 text-[11px] text-blue-700 font-semibold pt-2 border-t border-blue-100">
+                    <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Canal recomendado: {recordatorio.canal_recomendado}</span>
                   </div>
                 )}
+              </div>
+
+              {/* Metadata de IA Generativa */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-slate-400">
+                <div className="flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>
+                    Generado con <strong>{modeloTexto}</strong>
+                    {tiempoTexto ? ` en ${tiempoTexto}s` : ""}
+                    {esFallback ? " (Modo Contingencia)" : ""}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => cargarExplicacion(esDeclaracionEnCero)}
+                  className="flex items-center space-x-1 hover:text-slate-700 transition-colors cursor-pointer"
+                  title="Regenerar explicación con IA"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Regenerar</span>
+                </button>
               </div>
 
               {/* 5. Compuerta Human-in-the-Loop (HITL) */}
@@ -352,26 +354,56 @@ export default function ExplanationModal({
                 <div className="flex items-center space-x-2 mb-3">
                   <ShieldCheck className="w-5 h-5 text-blue-700" />
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Compuerta de Envío Seguro (Human-in-the-Loop)
+                    Compuerta de Envío Seguro (Human-in-the-Loop - Agente ReAct)
                   </h4>
                 </div>
 
                 {recordatorioProgramado ? (
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-center space-x-3">
-                    <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
-                    <div>
-                      <strong className="block font-bold text-sm">
-                        ¡Recordatorio Programado con Éxito!
-                      </strong>
-                      <span>
-                        Se ha registrado el recordatorio verificado para{" "}
-                        <strong>{emailDestino}</strong> 5 días antes del vencimiento.
-                      </span>
+                  <div className="space-y-3 animate-in fade-in duration-200">
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-start space-x-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-bold text-emerald-950">
+                          ¡Recordatorio Autorizado y Despachado por el Agente!
+                        </p>
+                        <p className="text-[11px] text-emerald-800 leading-relaxed">
+                          {resultadoAgente?.respuesta_final ||
+                            `El recordatorio fue confirmado mediante la compuerta HITL y enviado satisfactoriamente a ${emailDestino}.`}
+                        </p>
+                        {resultadoAgente?.trazas_herramientas && (
+                          <p className="text-[10px] font-mono text-emerald-700 pt-1">
+                            Ciclo ReAct: {resultadoAgente.num_iteraciones} iteraciones | {resultadoAgente.trazas_herramientas.length} herramientas ejecutadas
+                          </p>
+                        )}
+                      </div>
                     </div>
+
+                    {resultadoAgente?.trazas_herramientas && resultadoAgente.trazas_herramientas.length > 0 && (
+                      <div className="bg-white border border-slate-200 rounded-2xl p-3.5 text-[11px] space-y-2">
+                        <span className="font-bold text-slate-700 block uppercase text-[10px] tracking-wider">
+                          Bitácora de Razonamiento del Agente (ReAct Tools):
+                        </span>
+                        <div className="space-y-1.5 font-mono text-[10px]">
+                          {resultadoAgente.trazas_herramientas.map((t, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-1.5 bg-slate-50 rounded-lg border border-slate-100"
+                            >
+                              <span className="text-blue-700 font-bold">
+                                {idx + 1}. {t.herramienta}()
+                              </span>
+                              <span className="text-slate-400">
+                                {new Date(t.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <form onSubmit={handleProgramarRecordatorio} className="space-y-3">
-                    <div>
+                    <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                         Correo de Notificación
                       </label>
@@ -393,11 +425,11 @@ export default function ExplanationModal({
                         type="checkbox"
                         checked={confirmadoPorUsuario}
                         onChange={(e) => setConfirmadoPorUsuario(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 mt-0.5"
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 mt-0.5 cursor-pointer"
                       />
                       <span className="text-xs text-slate-700 leading-snug">
                         <strong>Confirmo expresamente</strong> que he revisado las fechas y condiciones de esta
-                        obligación tributaria y autorizo la programación del recordatorio a mi correo.
+                        obligación tributaria y autorizo la ejecución del agente y despacho a mi correo.
                       </span>
                     </label>
 
@@ -406,19 +438,19 @@ export default function ExplanationModal({
                       disabled={!confirmadoPorUsuario || enviandoHitl}
                       className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
                         confirmadoPorUsuario && !enviandoHitl
-                          ? "bg-blue-700 hover:bg-blue-800 text-white shadow-sm hover:shadow"
+                          ? "bg-blue-700 hover:bg-blue-800 text-white shadow-sm hover:shadow cursor-pointer"
                           : "bg-slate-300 text-slate-500 cursor-not-allowed"
                       }`}
                     >
                       {enviandoHitl ? (
                         <>
                           <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Autorizando con Compuerta HITL...</span>
+                          <span>Ejecutando Agente ReAct con Compuerta HITL...</span>
                         </>
                       ) : (
                         <>
                           <Lock className="w-3.5 h-3.5 text-blue-200" />
-                          <span>Autorizar y Programar Recordatorio por Correo</span>
+                          <span>Autorizar y Ejecutar Agente Autónomo</span>
                         </>
                       )}
                     </button>
@@ -426,7 +458,7 @@ export default function ExplanationModal({
                 )}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

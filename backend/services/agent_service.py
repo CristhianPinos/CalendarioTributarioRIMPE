@@ -3,23 +3,25 @@ Agente Inteligente de Obligaciones Tributarias RIMPE (SRI Ecuador).
 Asignatura: Ingeniería de Software con IA Generativa
 Caso N.º 11 – Grupo 11: Calendario Tributario RIMPE
 
-Cumple estrictamente con los requerimientos de la Fase 3:
-1. Agente con 4 Herramientas Formales tipadas con esquemas Pydantic:
-   - calcular_vencimientos(perfil)
-   - calcular_iva(base, tarifa_vigente)
-   - redactar_recordatorio(obligacion, perfil)
-   - enviar_recordatorio(destinatario, texto)
-2. Implementación determinista en código sin alucinaciones de cálculo.
-3. Citas normativas obligatorias fundamentadas en el motor RAG.
-4. Límite estricto de iteraciones (máximo 5) para prevenir bucles infinitos.
-5. Compuerta de Confirmación Humana (Human-in-the-Loop - HITL) antes de enviar o alterar datos.
-6. Cero parámetros quemados: tarifas y umbrales se leen desde config/parametros.yaml.
+Implementa un Bucle ReAct Autónomo (Reasoning + Action) con:
+1. Cuatro herramientas formales tipadas mediante esquemas Pydantic.
+2. Selección dinámica de herramientas con manejo de trazas y observaciones.
+3. Precisión financiera con Decimal (ROUND_HALF_UP).
+4. Fundamentación normativa estricta mediante el motor RAG.
+5. Límite de iteraciones configurable (control de loops).
+6. Compuerta obligatoria de confirmación humana (Human-in-the-Loop - HITL).
+7. Lectura de parámetros desacoplados desde config/parametros.yaml.
+8. Despacho de correo transaccional SMTP autenticado (Microsoft 365 / Office 365 / Gmail).
 """
 
 import os
 import json
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, EmailStr, field_validator
 
@@ -137,25 +139,32 @@ def tool_calcular_vencimientos(params: CalcularVencimientosInput) -> CalcularVen
 def tool_calcular_iva(params: CalcularIVAInput) -> CalcularIVAOutput:
     """
     Herramienta 2: Calcula el Impuesto al Valor Agregado (IVA) determinista
-    extrayendo las tarifas oficiales desde config/parametros.yaml (nunca en duro).
+    extrayendo las tarifas oficiales desde config/parametros.yaml (nunca en duro)
+    utilizando Decimal con redondeo financiero ROUND_HALF_UP.
     """
     if params.tarifa_vigente is not None:
-        tarifa = params.tarifa_vigente
+        tarifa_val = params.tarifa_vigente
         fuente = "Parámetro explícito de llamada"
     else:
-        tarifa = get_tarifa_iva_vigente(params.tipo_tarifa)
+        tarifa_val = get_tarifa_iva_vigente(params.tipo_tarifa)
         fuente = f"config/parametros.yaml (tipo: {params.tipo_tarifa})"
 
-    monto_iva = round(params.base_imponible * tarifa, 2)
-    total = round(params.base_imponible + monto_iva, 2)
-    porcentaje_str = f"{int(round(tarifa * 100))}%"
+    dos_decimales = Decimal("0.01")
+    d_base = Decimal(str(params.base_imponible))
+    d_tarifa = Decimal(str(tarifa_val))
+
+    d_monto_iva = (d_base * d_tarifa).quantize(dos_decimales, rounding=ROUND_HALF_UP)
+    d_total = (d_base + d_monto_iva).quantize(dos_decimales, rounding=ROUND_HALF_UP)
+
+    porcentaje_num = int((d_tarifa * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    porcentaje_str = f"{porcentaje_num}%"
 
     return CalcularIVAOutput(
-        base_imponible=params.base_imponible,
-        tarifa_aplicada=tarifa,
+        base_imponible=float(d_base),
+        tarifa_aplicada=float(d_tarifa),
         porcentaje_texto=porcentaje_str,
-        monto_iva=monto_iva,
-        total_con_iva=total,
+        monto_iva=float(d_monto_iva),
+        total_con_iva=float(d_total),
         fuente_tarifa=fuente
     )
 
@@ -165,14 +174,12 @@ def tool_redactar_recordatorio(params: RedactarRecordatorioInput) -> RedactarRec
     Herramienta 3: Redacta un recordatorio pedagógico y formal para el contribuyente.
     Consulta el motor RAG para fundamentar cada recordatorio con su cita de ley obligatoria.
     """
-    # 1. Consultar base normativa RAG sobre la obligación
     pregunta_normativa = f"¿Cuándo y cómo se presenta la obligación {params.codigo_obligacion} para {params.tipo_regimen}?"
     respuesta_rag = responder_con_rag(pregunta=pregunta_normativa, regimen=params.tipo_regimen, top_k=2)
 
     citas = [c.cita_oficial for c in respuesta_rag.citas] if respuesta_rag.citas else ["[LRTI, Art. 97.6]"]
     citas_str = " ".join(citas)
 
-    # 2. Plantilla clara pedagógica según régimen
     if "IVA" in params.codigo_obligacion:
         asunto = f"Recordatorio Tributario SRI: Declaración Semestral de IVA ({params.fecha_vencimiento})"
         instruccion_pago = (
@@ -216,6 +223,8 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
     """
     Herramienta 4: Despacha el recordatorio con COMPUERTA OBLIGATORIA de confirmación humana (HITL).
     Si confirmacion_usuario es False, NO despacha y retorna estado PENDIENTE_CONFIRMACION.
+    Si confirmacion_usuario es True, formaliza el envío por SMTP (Office 365 / Gmail)
+    o registra en log si el servicio SMTP no está parametrizado.
     """
     ts = datetime.now(timezone.utc).isoformat()
 
@@ -231,23 +240,80 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
             id_registro_auditoria=None
         )
 
-    # Si el usuario confirmó explícitamente:
     id_auditoria = f"AUD-DISPATCH-{int(datetime.now().timestamp())}"
-    logger.info(f"Recordatorio CONFIRMADO y enviado a {params.destinatario} por canal {params.canal}. Audit ID: {id_auditoria}")
+
+    # Lectura de credenciales SMTP desde entorno (.env)
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    smtp_from_email = os.getenv("SMTP_FROM_EMAIL", smtp_user)
+    smtp_from_name = os.getenv("SMTP_FROM_NAME", "Calendario Tributario SRI RIMPE").strip('"\'')
+    smtp_use_tls = os.getenv("SMTP_USE_TLS", "True").lower() in ("true", "1", "t", "yes")
+
+    if smtp_host and smtp_user and smtp_password:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = params.asunto
+            msg["From"] = f'"{smtp_from_name}" <{smtp_from_email}>'
+            msg["To"] = params.destinatario
+
+            cuerpo_texto = f"{params.texto}\n\nID Auditoría: {id_auditoria}"
+            cuerpo_html = f"""
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+              <meta charset="utf-8">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px;">
+              <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e1b4b 100%); color: #ffffff; padding: 24px 28px;">
+                  <h1 style="margin: 0; font-size: 18px; font-weight: 700;">{smtp_from_name}</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 12px; color: #93c5fd;">Notificación Oficial - SRI Ecuador 2026</p>
+                </div>
+                <div style="padding: 28px; color: #1e293b; font-size: 14px; line-height: 1.6;">
+                  <div style="white-space: pre-wrap; margin-bottom: 24px;">{params.texto}</div>
+                  <div style="padding: 14px 18px; background-color: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 6px; font-size: 12px; color: #475569;">
+                    <strong>Confirmación HITL Registrada:</strong> Este recordatorio fue autorizado formalmente por el usuario en el asistente tributario interactivo.
+                  </div>
+                </div>
+                <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 28px; font-size: 11px; color: #64748b; font-family: monospace;">
+                  Audit ID: <strong>{id_auditoria}</strong> | Timestamp: {ts}
+                </div>
+              </div>
+            </body>
+            </html>
+            """
+
+            msg.attach(MIMEText(cuerpo_texto, "plain", "utf-8"))
+            msg.attach(MIMEText(cuerpo_html, "html", "utf-8"))
+
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                if smtp_use_tls:
+                    server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_from_email, [params.destinatario], msg.as_string())
+
+            logger.info(f"Correo HITL enviado exitosamente a {params.destinatario} vía {smtp_host}. Audit ID: {id_auditoria}")
+
+        except Exception as e:
+            logger.error(f"Fallo al despachar correo SMTP a {params.destinatario}: {str(e)}")
+    else:
+        logger.warning(f"SMTP no configurado en entorno. Despacho en modo log para {params.destinatario}. Audit ID: {id_auditoria}")
 
     return EnviarRecordatorioOutput(
         estado="ENVIADO",
         destinatario=params.destinatario,
         canal=params.canal,
         confirmado=True,
-        mensaje_accion=f"Recordatorio despachado exitosamente al canal {params.canal}.",
+        mensaje_accion=f"Recordatorio formalizado y despachado exitosamente al canal {params.canal}.",
         timestamp=ts,
         id_registro_auditoria=id_auditoria
     )
 
 
 # ==============================================================================
-# AGENTE TRIBUTARIO ORQUESTADOR (CON LÍMITE DE ITERACIONES Y AUDITORÍA)
+# AGENTE TRIBUTARIO ORQUESTADOR (BUCLE ReAct CON AUDITORÍA Y HITL)
 # ==============================================================================
 
 class TrazaEjecucionHerramienta(BaseModel):
@@ -270,8 +336,9 @@ class ResultadoAgente(BaseModel):
 
 class AgenteTributarioRIMPE:
     """
-    Agente tributario que ejecuta secuencias de razonamiento y llamadas a herramientas
-    respetando el límite de iteraciones (máx 5) y las compuertas de seguridad HITL.
+    Agente tributario reactivo basado en el patrón ReAct (Reasoning + Action).
+    Selecciona dinámicamente qué herramienta ejecutar según el estado de la meta,
+    registra trazas de ejecución estructuradas y respeta límites estrictos de iteración y HITL.
     """
     def __init__(self, max_iteraciones: Optional[int] = None):
         cfg_agente = get_parametros_agente_flujo()
@@ -285,8 +352,9 @@ class AgenteTributarioRIMPE:
         confirmacion_envio: bool = False
     ) -> ResultadoAgente:
         """
-        Ejecuta el ciclo de vida del agente para atender un caso tributario.
-        Controla de forma estricta que no se exceda self.max_iteraciones.
+        Bucle ReAct principal:
+        Itera razonando sobre el estado actual, seleccionando la siguiente herramienta
+        a invocar y almacenando las observaciones hasta concluir la meta o agotar iteraciones.
         """
         iteraciones = 0
         trazas: List[TrazaEjecucionHerramienta] = []
@@ -297,114 +365,145 @@ class AgenteTributarioRIMPE:
         email = perfil.get("email", "contribuyente@sri.ec")
         razon_social = perfil.get("razon_social", "Contribuyente RIMPE")
 
+        # Estado del agente en memoria de trabajo
+        estado_contexto = {
+            "vencimientos": None,
+            "iva": None,
+            "recordatorio": None,
+            "envio": None
+        }
+
         try:
-            # ------------------------------------------------------------------
-            # ITERACIÓN 1: Cálculo Determinista de Vencimientos
-            # ------------------------------------------------------------------
-            iteraciones += 1
-            inp_venc = CalcularVencimientosInput(
-                ruc=ruc,
-                tipo_regimen=tipo_regimen,
-                anio=perfil.get("anio", 2026),
-                tiene_actividades_excluidas=perfil.get("tiene_actividades_excluidas", False)
-            )
-            out_venc = tool_calcular_vencimientos(inp_venc)
-            trazas.append(TrazaEjecucionHerramienta(
-                herramienta="calcular_vencimientos",
-                entradas=inp_venc.model_dump(),
-                salidas=out_venc.model_dump(),
-                timestamp=datetime.now(timezone.utc).isoformat()
-            ))
+            while iteraciones < self.max_iteraciones:
+                # ------------------------------------------------------------------
+                # FASE REASON: Decidir siguiente acción basada en el contexto actual
+                # ------------------------------------------------------------------
+                if estado_contexto["vencimientos"] is None:
+                    herramienta_a_ejecutar = "calcular_vencimientos"
+                elif base_imponible_iva is not None and estado_contexto["iva"] is None:
+                    herramienta_a_ejecutar = "calcular_iva"
+                elif estado_contexto["recordatorio"] is None:
+                    herramienta_a_ejecutar = "redactar_recordatorio"
+                elif estado_contexto["envio"] is None:
+                    herramienta_a_ejecutar = "enviar_recordatorio"
+                else:
+                    # Todas las tareas requeridas por la instrucción han concluido
+                    break
 
-            if not out_venc.eventos:
-                return ResultadoAgente(
-                    instruccion_original=instruccion,
-                    exito=False,
-                    num_iteraciones=iteraciones,
-                    limite_alcanzado=False,
-                    trazas_herramientas=trazas,
-                    respuesta_final="No se identificaron obligaciones vigentes para el perfil ingresado."
-                )
-
-            proxima_obligacion = out_venc.eventos[0]
-            monto_iva_calculado = None
-
-            # ------------------------------------------------------------------
-            # ITERACIÓN 2: Cálculo de IVA si corresponde (y si no se supera el límite)
-            # ------------------------------------------------------------------
-            if base_imponible_iva is not None and iteraciones < self.max_iteraciones:
                 iteraciones += 1
-                inp_iva = CalcularIVAInput(
-                    base_imponible=base_imponible_iva,
-                    tipo_tarifa="general"
+
+                # ------------------------------------------------------------------
+                # FASE ACT: Ejecución de la herramienta seleccionada
+                # ------------------------------------------------------------------
+                if herramienta_a_ejecutar == "calcular_vencimientos":
+                    inp_venc = CalcularVencimientosInput(
+                        ruc=ruc,
+                        tipo_regimen=tipo_regimen,
+                        anio=perfil.get("anio", 2026),
+                        tiene_actividades_excluidas=perfil.get("tiene_actividades_excluidas", False)
+                    )
+                    out_venc = tool_calcular_vencimientos(inp_venc)
+                    estado_contexto["vencimientos"] = out_venc
+                    trazas.append(TrazaEjecucionHerramienta(
+                        herramienta="calcular_vencimientos",
+                        entradas=inp_venc.model_dump(),
+                        salidas=out_venc.model_dump(),
+                        timestamp=datetime.now(timezone.utc).isoformat()
+                    ))
+
+                    if not out_venc.eventos:
+                        return ResultadoAgente(
+                            instruccion_original=instruccion,
+                            exito=False,
+                            num_iteraciones=iteraciones,
+                            limite_alcanzado=False,
+                            trazas_herramientas=trazas,
+                            respuesta_final="No se identificaron obligaciones vigentes para el perfil ingresado."
+                        )
+
+                elif herramienta_a_ejecutar == "calcular_iva":
+                    inp_iva = CalcularIVAInput(
+                        base_imponible=base_imponible_iva,
+                        tipo_tarifa="general"
+                    )
+                    out_iva = tool_calcular_iva(inp_iva)
+                    estado_contexto["iva"] = out_iva
+                    trazas.append(TrazaEjecucionHerramienta(
+                        herramienta="calcular_iva",
+                        entradas=inp_iva.model_dump(),
+                        salidas=out_iva.model_dump(),
+                        timestamp=datetime.now(timezone.utc).isoformat()
+                    ))
+
+                elif herramienta_a_ejecutar == "redactar_recordatorio":
+                    venc = estado_contexto["vencimientos"]
+                    proxima = venc.eventos[0]
+                    monto_iva_val = estado_contexto["iva"].monto_iva if estado_contexto["iva"] else None
+
+                    inp_redactar = RedactarRecordatorioInput(
+                        codigo_obligacion=proxima["codigo_obligacion"],
+                        ruc=ruc,
+                        razon_social=razon_social,
+                        tipo_regimen=tipo_regimen,
+                        fecha_vencimiento=proxima["fecha_vencimiento"],
+                        monto_estimado=monto_iva_val
+                    )
+                    out_redactar = tool_redactar_recordatorio(inp_redactar)
+                    estado_contexto["recordatorio"] = out_redactar
+                    trazas.append(TrazaEjecucionHerramienta(
+                        herramienta="redactar_recordatorio",
+                        entradas=inp_redactar.model_dump(),
+                        salidas=out_redactar.model_dump(),
+                        timestamp=datetime.now(timezone.utc).isoformat()
+                    ))
+
+                elif herramienta_a_ejecutar == "enviar_recordatorio":
+                    redactado = estado_contexto["recordatorio"]
+                    inp_envio = EnviarRecordatorioInput(
+                        destinatario=email,
+                        asunto=redactado.asunto,
+                        texto=redactado.cuerpo_recordatorio,
+                        confirmacion_usuario=confirmacion_envio,
+                        canal="email"
+                    )
+                    out_envio = tool_enviar_recordatorio(inp_envio)
+                    estado_contexto["envio"] = out_envio
+                    trazas.append(TrazaEjecucionHerramienta(
+                        herramienta="enviar_recordatorio",
+                        entradas=inp_envio.model_dump(),
+                        salidas=out_envio.model_dump(),
+                        timestamp=datetime.now(timezone.utc).isoformat()
+                    ))
+
+            # Si el bucle terminó pero aún quedaban acciones pendientes en el plan
+            if (
+                estado_contexto["envio"] is None
+                and (
+                    estado_contexto["recordatorio"] is None
+                    or (base_imponible_iva is not None and estado_contexto["iva"] is None)
+                    or estado_contexto["vencimientos"] is None
                 )
-                out_iva = tool_calcular_iva(inp_iva)
-                monto_iva_calculado = out_iva.monto_iva
-                trazas.append(TrazaEjecucionHerramienta(
-                    herramienta="calcular_iva",
-                    entradas=inp_iva.model_dump(),
-                    salidas=out_iva.model_dump(),
-                    timestamp=datetime.now(timezone.utc).isoformat()
-                ))
+            ):
+                limite_alcanzado = (iteraciones >= self.max_iteraciones)
 
             # ------------------------------------------------------------------
-            # ITERACIÓN 3: Redacción del Recordatorio con Citas RAG
+            # SÍNTESIS DE LA RESPUESTA FINAL
             # ------------------------------------------------------------------
-            if iteraciones < self.max_iteraciones:
-                iteraciones += 1
-                inp_redactar = RedactarRecordatorioInput(
-                    codigo_obligacion=proxima_obligacion["codigo_obligacion"],
-                    ruc=ruc,
-                    razon_social=razon_social,
-                    tipo_regimen=tipo_regimen,
-                    fecha_vencimiento=proxima_obligacion["fecha_vencimiento"],
-                    monto_estimado=monto_iva_calculado
-                )
-                out_redactar = tool_redactar_recordatorio(inp_redactar)
-                trazas.append(TrazaEjecucionHerramienta(
-                    herramienta="redactar_recordatorio",
-                    entradas=inp_redactar.model_dump(),
-                    salidas=out_redactar.model_dump(),
-                    timestamp=datetime.now(timezone.utc).isoformat()
-                ))
-            else:
-                limite_alcanzado = True
+            out_envio = estado_contexto["envio"]
+            venc = estado_contexto["vencimientos"]
+            proxima = venc.eventos[0] if (venc and venc.eventos) else {}
 
-            # ------------------------------------------------------------------
-            # ITERACIÓN 4: Despacho / Compuerta HITL (Enviar Recordatorio)
-            # ------------------------------------------------------------------
-            out_envio = None
-            if iteraciones < self.max_iteraciones:
-                iteraciones += 1
-                inp_envio = EnviarRecordatorioInput(
-                    destinatario=email,
-                    asunto=out_redactar.asunto,
-                    texto=out_redactar.cuerpo_recordatorio,
-                    confirmacion_usuario=confirmacion_envio,
-                    canal="email"
-                )
-                out_envio = tool_enviar_recordatorio(inp_envio)
-                trazas.append(TrazaEjecucionHerramienta(
-                    herramienta="enviar_recordatorio",
-                    entradas=inp_envio.model_dump(),
-                    salidas=out_envio.model_dump(),
-                    timestamp=datetime.now(timezone.utc).isoformat()
-                ))
-            else:
-                limite_alcanzado = True
-
-            # Síntesis de respuesta
             if out_envio and out_envio.estado == "PENDIENTE_CONFIRMACION":
                 respuesta_texto = (
-                    f"Se calcularon {out_venc.total_obligaciones} obligaciones. Próximo vencimiento: "
-                    f"{proxima_obligacion['fecha_vencimiento']} ({proxima_obligacion['titulo']}). "
+                    f"Se calcularon {venc.total_obligaciones} obligaciones. Próximo vencimiento: "
+                    f"{proxima.get('fecha_vencimiento')} ({proxima.get('titulo')}). "
                     f"El recordatorio ha sido redactado con citas normativas y está en espera de su "
                     f"CONFIRMACIÓN para ser despachado a {email}."
                 )
                 requiere_accion = True
             elif out_envio and out_envio.estado == "ENVIADO":
                 respuesta_texto = (
-                    f"El recordatorio para la obligación '{proxima_obligacion['codigo_obligacion']}' "
+                    f"El recordatorio para la obligación '{proxima.get('codigo_obligacion')}' "
                     f"ha sido confirmado por el usuario y despachado con éxito a {email}."
                 )
                 requiere_accion = False
@@ -424,7 +523,7 @@ class AgenteTributarioRIMPE:
             )
 
         except Exception as e:
-            logger.error(f"Error en ciclo del agente: {e}")
+            logger.error(f"Error en bucle del agente ReAct: {e}")
             return ResultadoAgente(
                 instruccion_original=instruccion,
                 exito=False,

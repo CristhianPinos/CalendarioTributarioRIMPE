@@ -126,7 +126,7 @@ async function apiRequest(endpoint, options = {}) {
 
 /**
  * Calcula el calendario personalizado de obligaciones tributarias para el contribuyente.
- * @param {Object} perfilData - { ruc, tipo_regimen, anio, tiene_actividades_excluidas }
+ * @param {Object} perfilData { ruc, tipo_regimen, anio, tiene_actividades_excluidas }
  */
 export async function calcularCalendario(perfilData) {
   if (USE_MOCKS) {
@@ -149,7 +149,7 @@ export async function calcularCalendario(perfilData) {
 
 /**
  * Obtiene la explicación pedagógica generada con IA (Google Gemini Flash) o catálogo de contingencia.
- * @param {Object} payload - { codigo_obligacion, tipo_regimen, fecha_vencimiento, noveno_digito, ruc, es_declaracion_en_cero }
+ * @param {Object} payload { codigo_obligacion, tipo_regimen, fecha_vencimiento, noveno_digito, ruc, es_declaracion_en_cero }
  */
 export async function obtenerExplicacion(payload) {
   if (USE_MOCKS) {
@@ -192,7 +192,7 @@ export async function obtenerExplicacion(payload) {
 
 /**
  * Simula la cuota o impuesto causado de Impuesto a la Renta según la Ley de Eficiencia Económica.
- * @param {Object} payload - { ingresos_brutos_anuales, tipo_regimen }
+ * @param {Object} payload { ingresos_brutos_anuales, tipo_regimen }
  */
 export async function simularCuotaRenta(payload) {
   if (USE_MOCKS) {
@@ -254,4 +254,47 @@ export async function verificarSaludBackend() {
   } catch (err) {
     return { online: false, error: err.message };
   }
+}
+
+/**
+ * Invoca el ciclo autónomo ReAct del Agente Tributario RIMPE.
+ * @param {Object} params
+ * @param {string} params.instruccion - Comando o meta para el agente.
+ * @param {Object} params.perfil - Datos del contribuyente (ruc, tipo_regimen, email, razon_social, etc.).
+ * @param {number|null} [params.base_imponible_iva=null] - Base imponible para cálculo de IVA opcional.
+ * @param {boolean} [params.confirmacion_envio=false] - Aprobación del usuario en compuerta HITL.
+ * @returns {Promise<Object>} Resultado con trazas de herramientas, estado y respuesta.
+ */
+export async function ejecutarAgente({
+  instruccion,
+  perfil,
+  base_imponible_iva = null,
+  confirmacion_envio = false,
+}) {
+  if (USE_MOCKS) {
+    await new Promise((r) => setTimeout(r, 500));
+    return {
+      data: {
+        instruccion_original: instruccion,
+        exito: true,
+        num_iteraciones: 4,
+        limite_alcanzado: false,
+        trazas_herramientas: [],
+        respuesta_final: "Agente ejecutado en modo mock determinista.",
+        estado_envio: confirmacion_envio ? "ENVIADO" : "PENDIENTE_CONFIRMACION",
+        requiere_accion_usuario: !confirmacion_envio,
+      },
+      latencyMs: "45.0",
+    };
+  }
+
+  return await apiRequest("/api/agente/ejecutar", {
+    method: "POST",
+    body: JSON.stringify({
+      instruccion,
+      perfil,
+      base_imponible_iva,
+      confirmacion_envio,
+    }),
+  });
 }
