@@ -14,6 +14,7 @@ from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.responses import JSONResponse
 
 logger = logging.getLogger("rimpe.audit.lopdp")
 logger.setLevel(logging.INFO)
@@ -59,6 +60,8 @@ def anonimizar_texto(texto: str) -> str:
         r"\1****\2",
         texto
     )
+    # Cédulas de 10 dígitos, sin alterar los RUC ya enmascarados.
+    texto = re.sub(r"\b(\d{2})\d{6}(\d{2})\b", r"\1******\2", texto)
     # Anonimizar emails
     texto = re.sub(
         r"\b([a-zA-Z0-9_.+-])[a-zA-Z0-9_.+-]*@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)\b",
@@ -66,6 +69,21 @@ def anonimizar_texto(texto: str) -> str:
         texto
     )
     return texto
+
+
+def anonimizar_traza(valor):
+    """Minimiza datos personales en trazas de herramientas devueltas por la API."""
+    if isinstance(valor, dict):
+        ocultar = {"razon_social", "nombre_comercial", "asunto", "texto", "cuerpo_recordatorio"}
+        return {
+            clave: "[DATO_PROTEGIDO]" if clave in ocultar else anonimizar_traza(item)
+            for clave, item in valor.items()
+        }
+    if isinstance(valor, list):
+        return [anonimizar_traza(item) for item in valor]
+    if isinstance(valor, str):
+        return anonimizar_texto(valor)
+    return valor
 
 
 class LoggingLOPDPMiddleware(BaseHTTPMiddleware):
@@ -77,10 +95,12 @@ class LoggingLOPDPMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start_time = time.time()
         metodo = request.method
-        ruta = request.url.path
+        # La plantilla de ruta evita registrar IDs aportados por el cliente.
+        ruta = "<sin_resolver>"
 
         try:
             response = await call_next(request)
+            ruta = getattr(request.scope.get("route"), "path", "<sin_resolver>")
             process_time_ms = round((time.time() - start_time) * 1000, 2)
 
             # Inyectar cabecera de auditoría de tiempo de proceso
@@ -90,7 +110,7 @@ class LoggingLOPDPMiddleware(BaseHTTPMiddleware):
             # Registro de auditoría seguro (sin PII)
             logger.info(
                 f"METHOD={metodo} PATH={ruta} STATUS={response.status_code} "
-                f"LATENCY_MS={process_time_ms} CLIENT_IP={request.client.host if request.client else 'unknown'}"
+                f"LATENCY_MS={process_time_ms}"
             )
 
             return response
@@ -101,4 +121,11 @@ class LoggingLOPDPMiddleware(BaseHTTPMiddleware):
                 f"METHOD={metodo} PATH={ruta} STATUS=500 ERROR={type(exc).__name__} "
                 f"LATENCY_MS={process_time_ms}"
             )
-            raise exc
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "No se pudo procesar la solicitud."},
+                headers={
+                    "X-Process-Time-Ms": str(process_time_ms),
+                    "X-Data-Protection": "LOPDP-Ecuador-Compliant",
+                },
+            )

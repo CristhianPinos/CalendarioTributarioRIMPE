@@ -197,3 +197,22 @@ python eval/run_eval.py
 # 2. Verificar la suite completa de pruebas unitarias
 python -m pytest backend/tests/
 ```
+
+---
+
+## 8. Comparación de la semana 4
+
+El resultado de la semana 3 se preservó en [`eval/resultados_semana3.json`](../eval/resultados_semana3.json). El mismo dataset se evaluó el 7 de noviembre de 2026 con el código de la fase 4 en [`eval/resultados_semana4_local.json`](../eval/resultados_semana4_local.json). Se validó además el modo HTTP del runner contra un servidor local en [`eval/resultados_semana4_http_local.json`](../eval/resultados_semana4_http_local.json). **Estas mediciones son locales; no representan aún la latencia ni disponibilidad de Render.**
+
+| Métrica | Semana 3 | Semana 4 local | Cambio |
+| --- | ---: | ---: | ---: |
+| Perfiles completos correctos | 10/10 | 10/10 | 0 |
+| Fechas exactas | 23/23 | 23/23 | 0 |
+| Hit@3 RAG | 16/16 | 16/16 | 0 |
+| Citas obligatorias | 16/16 | 16/16 | 0 |
+| F1 de abstención | 100 % | 100 % | 0 puntos |
+| Fugas de seguridad | 0 | 0 | 0 |
+| Latencia cálculo p50 / p95 | No medida | 0,01 / 6,53 ms | No comparable |
+| Latencia RAG p50 / p95 | No medida | 9,61 / 12,73 ms | No comparable |
+
+La latencia local mide el tiempo de cada llamada del runner, con el primer acceso incluido. No equivale al tiempo de red de una instancia Free que puede estar suspendida. El runner acepta `--base-url` para repetir la evaluación por HTTP sin cambiar las reglas tributarias. La evaluación de producción y la actualización de `eval/resultados_evaluacion.json` están pendientes de una URL pública verificada.

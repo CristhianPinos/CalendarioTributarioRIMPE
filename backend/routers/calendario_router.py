@@ -68,15 +68,15 @@ async def endpoint_calcular_vencimientos(request: CalculoVencimientosRequest) ->
             tiene_actividades_excluidas=request.tiene_actividades_excluidas
         )
         return CalendarioTributarioResponse(**resultado)
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Error en validación tributaria: {str(e)}"
+            detail="Los datos tributarios proporcionados no son válidos."
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error inesperado al calcular vencimientos: {str(e)}"
+            detail="No se pudo calcular el calendario tributario."
         )
 
 

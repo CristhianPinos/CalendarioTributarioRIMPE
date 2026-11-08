@@ -14,7 +14,10 @@ Cumple con la orden de la Fase 3 y la Checklist de Entrega 3:
 
 import os
 import json
+import hashlib
 import logging
+import threading
+from functools import wraps
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -34,6 +37,7 @@ from backend.services.agent_service import (
     EnviarRecordatorioInput,
     EnviarRecordatorioOutput
 )
+from backend.services.storage import SQLiteStore
 
 logger = logging.getLogger("rimpe.scheduler_service")
 
@@ -59,11 +63,12 @@ class RecordatorioColaItem(BaseModel):
     asunto: str
     cuerpo_recordatorio: str
     citas_normativas: List[str]
-    estado: str = Field(default="PENDIENTE_CONFIRMACION", description="PENDIENTE_CONFIRMACION o ENVIADO")
+    estado: str = Field(default="PENDIENTE_CONFIRMACION", description="PENDIENTE_CONFIRMACION, EN_PROCESO, ENVIADO, SIMULADO, ERROR_ENVIO o ESTADO_INCIERTO")
     fecha_generacion: str
     fecha_envio: Optional[str] = None
     id_auditoria_envio: Optional[str] = None
     usuario_confirmador: Optional[str] = None
+    fecha_ultimo_intento: Optional[str] = None
 
 
 class ResumenTareaDiaria(BaseModel):
@@ -169,13 +174,16 @@ class ColaRecordatoriosStore:
         items = self.obtener_todos()
         items.append(recordatorio.model_dump())
         self.guardar_todos(items)
+        return True
 
-    def actualizar_estado_envio(self, id_recordatorio: str, id_auditoria: str, usuario_confirmador: str) -> Optional[RecordatorioColaItem]:
+    def actualizar_estado_envio(self, id_recordatorio: str, id_auditoria: str, usuario_confirmador: str, estado: str = "ENVIADO") -> Optional[RecordatorioColaItem]:
         items = self.obtener_todos()
         for it in items:
             if it["id_recordatorio"] == id_recordatorio:
-                it["estado"] = "ENVIADO"
-                it["fecha_envio"] = datetime.now(timezone.utc).isoformat()
+                it["estado"] = estado
+                it["fecha_ultimo_intento"] = datetime.now(timezone.utc).isoformat()
+                if estado == "ENVIADO":
+                    it["fecha_envio"] = it["fecha_ultimo_intento"]
                 it["id_auditoria_envio"] = id_auditoria
                 it["usuario_confirmador"] = usuario_confirmador
                 self.guardar_todos(items)
@@ -187,7 +195,35 @@ class ColaRecordatoriosStore:
         self.guardar_todos([])
 
 
-_STORE_GLOBAL = ColaRecordatoriosStore()
+_STORE_GLOBAL = SQLiteStore()
+_DISPATCH_LOCK = threading.Lock()
+_SCAN_LOCK = threading.Lock()
+
+
+class EnvioInciertoError(RuntimeError):
+    """El SMTP pudo haber aceptado un mensaje cuyo resultado no se confirmó."""
+
+
+class ConsentimientoRequeridoError(RuntimeError):
+    """El perfil no autoriza recordatorios para el destinatario actual."""
+
+
+def _serializar_confirmacion(func):
+    """Evita dos confirmaciones simultáneas del mismo proceso sobre la cola JSON."""
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        with _DISPATCH_LOCK:
+            return func(*args, **kwargs)
+    return wrapped
+
+
+def _serializar_escaneo(func):
+    """Evita que el disparador diario y la ruta manual escriban a la vez."""
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        with _SCAN_LOCK:
+            return func(*args, **kwargs)
+    return wrapped
 
 
 # ==============================================================================
@@ -213,6 +249,7 @@ def calcular_dias_habiles_entre(fecha_inicio: date, fecha_fin: date, feriados: L
     return dias_habiles
 
 
+@_serializar_escaneo
 def ejecutar_tarea_diaria_recordatorios(
     fecha_referencia: Optional[date] = None,
     contribuyentes: Optional[List[Dict[str, Any]]] = None,
@@ -228,7 +265,12 @@ def ejecutar_tarea_diaria_recordatorios(
     """
     db = store or _STORE_GLOBAL
     hoy = fecha_referencia or date.today()
-    lista_contribuyentes = contribuyentes or CONTRIBUYENTES_REGISTRADOS_DEFAULT
+    if contribuyentes is not None:
+        lista_contribuyentes = contribuyentes
+    elif os.getenv("SCHEDULER_ALLOW_DEMO_PROFILES", "false").lower() in ("1", "true", "yes"):
+        lista_contribuyentes = CONTRIBUYENTES_REGISTRADOS_DEFAULT
+    else:
+        lista_contribuyentes = db.listar_perfiles_consentidos()
 
     cfg_flujo = get_parametros_agente_flujo()
     dias_anticipacion = cfg_flujo.get("dias_anticipacion_alerta_diaria", 5)
@@ -280,7 +322,9 @@ def ejecutar_tarea_diaria_recordatorios(
 
                         # Crear item de cola en estado PENDIENTE_CONFIRMACION
                         rec_item = RecordatorioColaItem(
-                            id_recordatorio=f"REC-{c['ruc'][8]}-{c['ruc'][:4]}-{codigo_ob}-{evento['fecha_vencimiento'].replace('-', '')}",
+                            id_recordatorio="REC-" + hashlib.sha256(
+                                f"{c['ruc']}|{codigo_ob}|{evento['fecha_vencimiento']}".encode("utf-8")
+                            ).hexdigest()[:32],
                             ruc=c["ruc"],
                             razon_social=c.get("razon_social", "Contribuyente"),
                             email=c.get("email", "contacto@sri.ec"),
@@ -296,11 +340,13 @@ def ejecutar_tarea_diaria_recordatorios(
                             fecha_generacion=datetime.now(timezone.utc).isoformat()
                         )
 
-                        db.agregar_recordatorio(rec_item)
-                        recordatorios_generados.append(rec_item)
+                        if db.agregar_recordatorio(rec_item):
+                            recordatorios_generados.append(rec_item)
+                        else:
+                            omitidos_por_idempotencia += 1
 
         except Exception as e:
-            logger.error(f"Error al procesar contribuyente {c.get('ruc')}: {e}")
+            logger.error("Error al procesar contribuyente: %s", type(e).__name__)
 
     logger.info(
         f"Tarea diaria completada. Evaluados: {len(lista_contribuyentes)}, "
@@ -320,12 +366,19 @@ def ejecutar_tarea_diaria_recordatorios(
 
 
 def listar_recordatorios_pendientes(store: Optional[ColaRecordatoriosStore] = None) -> List[RecordatorioColaItem]:
-    """Retorna todos los recordatorios en la cola que esperan confirmación humana."""
+    """Retorna recordatorios pendientes o con fallo seguro para revisión y reintento."""
     db = store or _STORE_GLOBAL
     items = db.obtener_todos()
-    return [RecordatorioColaItem(**it) for it in items if it.get("estado") == "PENDIENTE_CONFIRMACION"]
+    return [RecordatorioColaItem(**it) for it in items if it.get("estado") in ("PENDIENTE_CONFIRMACION", "SIMULADO", "ERROR_ENVIO")]
 
 
+def listar_recordatorios_en_revision(store: Optional[ColaRecordatoriosStore] = None) -> List[RecordatorioColaItem]:
+    """Muestra envíos inciertos que requieren verificación fuera del sistema."""
+    db = store or _STORE_GLOBAL
+    return [RecordatorioColaItem(**it) for it in db.obtener_todos() if it.get("estado") in ("ESTADO_INCIERTO", "EN_PROCESO")]
+
+
+@_serializar_confirmacion
 def confirmar_y_despachar_recordatorio(
     id_recordatorio: str,
     usuario_confirmador: str = "contador_autorizado",
@@ -355,8 +408,21 @@ def confirmar_y_despachar_recordatorio(
             confirmado=True,
             mensaje_accion="El recordatorio ya fue enviado previamente (idempotente).",
             timestamp=item_encontrado.get("fecha_envio", datetime.now(timezone.utc).isoformat()),
-            id_registro_auditoria=item_encontrado.get("id_auditoria_envio")
+            id_registro_auditoria=item_encontrado.get("id_auditoria_envio"),
+            usuario_confirmador=item_encontrado.get("usuario_confirmador"),
         )
+
+    if item_encontrado["estado"] == "ESTADO_INCIERTO":
+        raise EnvioInciertoError("El resultado del envío es incierto. Revise el servidor SMTP antes de reintentar.")
+
+    if item_encontrado["estado"] == "EN_PROCESO":
+        raise EnvioInciertoError("El envío está en proceso o quedó sin resultado. Revise el servidor SMTP.")
+
+    if hasattr(db, "has_consent") and not db.has_consent(item_encontrado["ruc"], item_encontrado["email"]):
+        raise ConsentimientoRequeridoError("El perfil no autoriza recordatorios para el destinatario actual.")
+
+    if hasattr(db, "reservar_envio") and not db.reservar_envio(id_recordatorio):
+        raise EnvioInciertoError("El recordatorio ya está siendo procesado o requiere revisión.")
 
     # Invocar herramienta formal con confirmación=True
     inp_envio = EnviarRecordatorioInput(
@@ -366,13 +432,20 @@ def confirmar_y_despachar_recordatorio(
         confirmacion_usuario=True,
         canal="email"
     )
-    out_envio = tool_enviar_recordatorio(inp_envio)
+    try:
+        out_envio = tool_enviar_recordatorio(inp_envio)
+    except Exception:
+        if hasattr(db, "reservar_envio"):
+            db.actualizar_estado_envio(id_recordatorio, "AUD-RESULTADO-INCIERTO", usuario_confirmador, "ESTADO_INCIERTO")
+        raise
+    out_envio = out_envio.model_copy(update={"usuario_confirmador": usuario_confirmador})
 
-    # Actualizar estado en almacén
+    # Persistir exactamente el estado observado; solo ENVIADO registra fecha de envío.
     db.actualizar_estado_envio(
         id_recordatorio=id_recordatorio,
         id_auditoria=out_envio.id_registro_auditoria or "AUD-DEFAULT",
-        usuario_confirmador=usuario_confirmador
+        usuario_confirmador=usuario_confirmador,
+        estado=out_envio.estado,
     )
 
     return out_envio
@@ -383,13 +456,16 @@ def confirmar_todos_los_pendientes(
     store: Optional[ColaRecordatoriosStore] = None
 ) -> List[EnviarRecordatorioOutput]:
     """Confirma y despacha en lote todos los recordatorios pendientes de la cola."""
-    pendientes = listar_recordatorios_pendientes(store)
+    pendientes = [p for p in listar_recordatorios_pendientes(store) if p.estado == "PENDIENTE_CONFIRMACION"]
     resultados = []
     for p in pendientes:
-        res = confirmar_y_despachar_recordatorio(
-            id_recordatorio=p.id_recordatorio,
-            usuario_confirmador=usuario_confirmador,
-            store=store
-        )
-        resultados.append(res)
+        try:
+            res = confirmar_y_despachar_recordatorio(
+                id_recordatorio=p.id_recordatorio,
+                usuario_confirmador=usuario_confirmador,
+                store=store
+            )
+            resultados.append(res)
+        except ConsentimientoRequeridoError:
+            logger.info("Recordatorio omitido por ausencia de consentimiento vigente.")
     return resultados

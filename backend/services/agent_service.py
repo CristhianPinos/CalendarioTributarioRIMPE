@@ -18,12 +18,14 @@ import os
 import json
 import logging
 import smtplib
+from uuid import uuid4
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, EmailStr, field_validator
+from backend.middleware.logging_lopdp import anonimizar_traza
 
 from backend.services.config_loader import (
     load_parametros,
@@ -109,13 +111,14 @@ class EnviarRecordatorioInput(BaseModel):
 
 
 class EnviarRecordatorioOutput(BaseModel):
-    estado: str = Field(..., description="PENDIENTE_CONFIRMACION o ENVIADO")
+    estado: str = Field(..., description="PENDIENTE_CONFIRMACION, ENVIADO, SIMULADO, ERROR_ENVIO o ESTADO_INCIERTO")
     destinatario: str
     canal: str
     confirmado: bool
     mensaje_accion: str
     timestamp: str
     id_registro_auditoria: Optional[str] = None
+    usuario_confirmador: Optional[str] = None
 
 
 # ==============================================================================
@@ -223,13 +226,12 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
     """
     Herramienta 4: Despacha el recordatorio con COMPUERTA OBLIGATORIA de confirmación humana (HITL).
     Si confirmacion_usuario es False, NO despacha y retorna estado PENDIENTE_CONFIRMACION.
-    Si confirmacion_usuario es True, formaliza el envío por SMTP (Office 365 / Gmail)
-    o registra en log si el servicio SMTP no está parametrizado.
+    ENVIADO significa que el servidor SMTP aceptó el mensaje, no que llegó a la bandeja.
     """
     ts = datetime.now(timezone.utc).isoformat()
 
     if not params.confirmacion_usuario:
-        logger.info(f"Recordatorio preparado para {params.destinatario}. Detenido en compuerta HITL (requiere confirmación).")
+        logger.info("Recordatorio detenido en compuerta HITL; requiere confirmación.")
         return EnviarRecordatorioOutput(
             estado="PENDIENTE_CONFIRMACION",
             destinatario=params.destinatario,
@@ -240,11 +242,11 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
             id_registro_auditoria=None
         )
 
-    id_auditoria = f"AUD-DISPATCH-{int(datetime.now().timestamp())}"
+    id_auditoria = f"AUD-DISPATCH-{uuid4().hex}"
 
     # Lectura de credenciales SMTP desde entorno (.env)
     smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_port_raw = os.getenv("SMTP_PORT", "587")
     smtp_user = os.getenv("SMTP_USER")
     smtp_password = os.getenv("SMTP_PASSWORD")
     smtp_from_email = os.getenv("SMTP_FROM_EMAIL", smtp_user)
@@ -252,7 +254,10 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
     smtp_use_tls = os.getenv("SMTP_USE_TLS", "True").lower() in ("true", "1", "t", "yes")
 
     if smtp_host and smtp_user and smtp_password:
+        accepted = False
+        sending = False
         try:
+            smtp_port = int(smtp_port_raw)
             msg = MIMEMultipart("alternative")
             msg["Subject"] = params.asunto
             msg["From"] = f'"{smtp_from_name}" <{smtp_from_email}>'
@@ -292,21 +297,42 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
                 if smtp_use_tls:
                     server.starttls()
                 server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_from_email, [params.destinatario], msg.as_string())
+                sending = True
+                refused = server.sendmail(smtp_from_email, [params.destinatario], msg.as_string())
+                if refused:
+                    sending = False
+                    raise ValueError("El servidor SMTP rechazó al destinatario.")
+                accepted = True
 
-            logger.info(f"Correo HITL enviado exitosamente a {params.destinatario} vía {smtp_host}. Audit ID: {id_auditoria}")
+            logger.info(f"Servidor SMTP aceptó el correo. Audit ID: {id_auditoria}")
 
-        except Exception as e:
-            logger.error(f"Fallo al despachar correo SMTP a {params.destinatario}: {str(e)}")
+        except Exception:
+            if accepted:
+                logger.warning("SMTP aceptó el mensaje pero falló el cierre de conexión. Audit ID: %s", id_auditoria)
+            else:
+                estado = "ESTADO_INCIERTO" if sending else "ERROR_ENVIO"
+                logger.error("No se pudo confirmar el despacho SMTP. Estado: %s. Audit ID: %s", estado, id_auditoria)
+                return EnviarRecordatorioOutput(
+                    estado=estado, destinatario=params.destinatario, canal=params.canal,
+                    confirmado=True, mensaje_accion=(
+                        "No se pudo determinar si SMTP aceptó el mensaje; revise el servidor antes de reintentar."
+                        if sending else "El envío SMTP falló antes de transmitir el mensaje; puede reintentarse."
+                    ), timestamp=ts, id_registro_auditoria=id_auditoria,
+                )
     else:
-        logger.warning(f"SMTP no configurado en entorno. Despacho en modo log para {params.destinatario}. Audit ID: {id_auditoria}")
+        logger.warning("SMTP no configurado. Envío simulado. Audit ID: %s", id_auditoria)
+        return EnviarRecordatorioOutput(
+            estado="SIMULADO", destinatario=params.destinatario, canal=params.canal,
+            confirmado=True, mensaje_accion="Aprobación registrada en modo simulación; no se envió ningún correo.",
+            timestamp=ts, id_registro_auditoria=id_auditoria,
+        )
 
     return EnviarRecordatorioOutput(
         estado="ENVIADO",
         destinatario=params.destinatario,
         canal=params.canal,
         confirmado=True,
-        mensaje_accion=f"Recordatorio formalizado y despachado exitosamente al canal {params.canal}.",
+        mensaje_accion="El servidor SMTP aceptó el recordatorio para su entrega.",
         timestamp=ts,
         id_registro_auditoria=id_auditoria
     )
@@ -332,6 +358,7 @@ class ResultadoAgente(BaseModel):
     respuesta_final: str
     estado_envio: Optional[str] = None
     requiere_accion_usuario: bool = False
+    usuario_confirmador: Optional[str] = None
 
 
 class AgenteTributarioRIMPE:
@@ -406,8 +433,8 @@ class AgenteTributarioRIMPE:
                     estado_contexto["vencimientos"] = out_venc
                     trazas.append(TrazaEjecucionHerramienta(
                         herramienta="calcular_vencimientos",
-                        entradas=inp_venc.model_dump(),
-                        salidas=out_venc.model_dump(),
+                        entradas=anonimizar_traza(inp_venc.model_dump()),
+                        salidas=anonimizar_traza(out_venc.model_dump()),
                         timestamp=datetime.now(timezone.utc).isoformat()
                     ))
 
@@ -430,8 +457,8 @@ class AgenteTributarioRIMPE:
                     estado_contexto["iva"] = out_iva
                     trazas.append(TrazaEjecucionHerramienta(
                         herramienta="calcular_iva",
-                        entradas=inp_iva.model_dump(),
-                        salidas=out_iva.model_dump(),
+                        entradas=anonimizar_traza(inp_iva.model_dump()),
+                        salidas=anonimizar_traza(out_iva.model_dump()),
                         timestamp=datetime.now(timezone.utc).isoformat()
                     ))
 
@@ -452,8 +479,8 @@ class AgenteTributarioRIMPE:
                     estado_contexto["recordatorio"] = out_redactar
                     trazas.append(TrazaEjecucionHerramienta(
                         herramienta="redactar_recordatorio",
-                        entradas=inp_redactar.model_dump(),
-                        salidas=out_redactar.model_dump(),
+                        entradas=anonimizar_traza(inp_redactar.model_dump()),
+                        salidas=anonimizar_traza(out_redactar.model_dump()),
                         timestamp=datetime.now(timezone.utc).isoformat()
                     ))
 
@@ -470,8 +497,8 @@ class AgenteTributarioRIMPE:
                     estado_contexto["envio"] = out_envio
                     trazas.append(TrazaEjecucionHerramienta(
                         herramienta="enviar_recordatorio",
-                        entradas=inp_envio.model_dump(),
-                        salidas=out_envio.model_dump(),
+                        entradas=anonimizar_traza(inp_envio.model_dump()),
+                        salidas=anonimizar_traza(out_envio.model_dump()),
                         timestamp=datetime.now(timezone.utc).isoformat()
                     ))
 
@@ -507,6 +534,12 @@ class AgenteTributarioRIMPE:
                     f"ha sido confirmado por el usuario y despachado con éxito a {email}."
                 )
                 requiere_accion = False
+            elif out_envio and out_envio.estado == "SIMULADO":
+                respuesta_texto = "La aprobación fue registrada en modo simulación. No se envió ningún correo."
+                requiere_accion = True
+            elif out_envio and out_envio.estado in ("ERROR_ENVIO", "ESTADO_INCIERTO"):
+                respuesta_texto = out_envio.mensaje_accion
+                requiere_accion = True
             else:
                 respuesta_texto = f"Ciclo completado con {iteraciones} iteraciones."
                 requiere_accion = False
@@ -523,13 +556,13 @@ class AgenteTributarioRIMPE:
             )
 
         except Exception as e:
-            logger.error(f"Error en bucle del agente ReAct: {e}")
+            logger.error("Error en bucle del agente ReAct: %s", type(e).__name__)
             return ResultadoAgente(
                 instruccion_original=instruccion,
                 exito=False,
                 num_iteraciones=iteraciones,
                 limite_alcanzado=limite_alcanzado,
                 trazas_herramientas=trazas,
-                respuesta_final=f"Error durante la ejecución del agente: {str(e)}",
+                respuesta_final="No se pudo completar la operación del agente. Revise los datos e inténtelo de nuevo.",
                 requiere_accion_usuario=False
             )

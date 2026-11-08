@@ -20,6 +20,7 @@ import {
   User,
 } from "lucide-react";
 import { validarRucPersonaNatural } from "../utils/rucValidator";
+import { guardarPerfilRegistrado, verificarSaludBackend } from "../services/apiClient";
 
 // Mapeo oficial del SRI de noveno dígito a día de vencimiento nominal
 const DIAS_POR_NOVENO_DIGITO = {
@@ -78,6 +79,22 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
   const [tieneActividadesExcluidas, setTieneActividadesExcluidas] = useState(false);
   const [anio, setAnio] = useState(2026);
   const [email, setEmail] = useState("contacto@empresa.ec");
+  const [correoNotificaciones, setCorreoNotificaciones] = useState(false);
+  const [operador, setOperador] = useState("");
+  const [claveOperador, setClaveOperador] = useState("");
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false);
+  const [estadoGuardado, setEstadoGuardado] = useState("");
+  const [demoReadOnly, setDemoReadOnly] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    verificarSaludBackend().then((result) => {
+      if (active && result.online) setDemoReadOnly(Boolean(result.data?.demo_readonly));
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => { setEstadoGuardado(""); }, [ruc, razonSocial, tipoRegimen, tieneActividadesExcluidas, anio, email, correoNotificaciones]);
 
   const [estadoRuc, setEstadoRuc] = useState({
     valido: true,
@@ -132,6 +149,31 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
       anio: parseInt(anio, 10),
       email,
     });
+  };
+
+  const handleGuardarPerfil = async () => {
+    if (!estadoRuc.valido || !puedeAvanzarPaso3 || !operador || !claveOperador) return;
+    setGuardandoPerfil(true);
+    setEstadoGuardado("");
+    try {
+      await guardarPerfilRegistrado({
+        ruc,
+        razon_social: razonSocial,
+        tipo_regimen: tipoRegimen,
+        tiene_actividades_excluidas: tieneActividadesExcluidas,
+        anio,
+        email,
+        correo_notificaciones: correoNotificaciones,
+      }, { username: operador, password: claveOperador });
+      setEstadoGuardado(correoNotificaciones
+        ? "Perfil guardado con autorización para recordatorios."
+        : "Perfil guardado sin autorización para recordatorios.");
+    } catch (error) {
+      setEstadoGuardado(error.message || "No se pudo guardar el perfil.");
+    } finally {
+      setClaveOperador("");
+      setGuardandoPerfil(false);
+    }
   };
 
   return (
@@ -442,6 +484,26 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
                 <span className="font-bold text-slate-800">{email}</span>
               </div>
             </div>
+            {demoReadOnly ? (
+              <p className="border border-amber-200 bg-amber-50 rounded-xl p-4 text-xs text-amber-900">
+                Demostración pública: genera el calendario sin registrar datos personales. Los recordatorios persistentes están desactivados.
+              </p>
+            ) : <div className="border border-slate-200 rounded-xl p-4 space-y-3 text-xs">
+              <h3 className="font-bold text-slate-800">Registro opcional para el escaneo diario</h3>
+              <p className="text-slate-600">El calendario se puede generar sin guardar el perfil. Solo un operador autorizado puede registrar el perfil.</p>
+              <label className="flex items-start gap-2 text-slate-700">
+                <input type="checkbox" checked={correoNotificaciones} onChange={(e) => setCorreoNotificaciones(e.target.checked)} className="mt-0.5" />
+                <span>Confirmo que el contribuyente autorizó recibir recordatorios por correo. Puedo desactivar esta autorización y volver a guardar el perfil.</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input aria-label="Usuario del operador" autoComplete="username" value={operador} onChange={(e) => setOperador(e.target.value)} placeholder="Usuario del operador" className="border border-slate-300 rounded-lg p-2" />
+                <input aria-label="Clave del operador" type="password" autoComplete="off" value={claveOperador} onChange={(e) => setClaveOperador(e.target.value)} placeholder="Clave del operador" className="border border-slate-300 rounded-lg p-2" />
+              </div>
+              <button type="button" onClick={handleGuardarPerfil} disabled={guardandoPerfil || !operador || !claveOperador} className="bg-blue-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-2 font-semibold">
+                {guardandoPerfil ? "Guardando..." : "Guardar perfil"}
+              </button>
+              {estadoGuardado && <p role="status" className="text-slate-700">{estadoGuardado}</p>}
+            </div>}
           </div>
         )}
 

@@ -1,0 +1,26 @@
+# Demostración pública sin persistencia de perfiles ni envío de correo.
+# Render Free pierde cambios locales al suspenderse o reiniciarse.
+services:
+  - type: web
+    name: calendario-rimpe-g11-demo
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: RIMPE_DEMO_READONLY
+        value: "true"
+      - key: SCHEDULER_ENABLED
+        value: "false"
+      - key: SCHEDULER_ALLOW_DEMO_PROFILES
+        value: "false"
+      - key: RIMPE_DB_PATH
+        value: /tmp/rimpe-demo/rimpe.sqlite3
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: LOG_LEVEL
+        value: INFO

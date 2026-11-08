@@ -22,6 +22,7 @@ from backend.services.scheduler import (
     ColaRecordatoriosStore,
     CONTRIBUYENTES_REGISTRADOS_DEFAULT
 )
+from backend.services.storage import SQLiteStore
 from backend.routers.flujo_router import (
     endpoint_ejecutar_tarea_diaria,
     endpoint_listar_recordatorios_pendientes,
@@ -34,8 +35,21 @@ TEST_DB_PATH = Path("data/processed/test_recordatorios_temp.json")
 
 
 @pytest.fixture(autouse=True)
-def clean_test_store():
+def clean_test_store(monkeypatch):
     """Limpia la base de datos temporal antes y después de cada prueba."""
+    monkeypatch.setenv("SMTP_HOST", "smtp.test")
+    monkeypatch.setenv("SMTP_USER", "operador@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "clave-de-prueba")
+
+    class SMTPFake:
+        def __init__(self, *args, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def starttls(self): pass
+        def login(self, *args): pass
+        def sendmail(self, *args): return {}
+
+    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", SMTPFake)
     store = ColaRecordatoriosStore(TEST_DB_PATH)
     store.limpiar_cola()
     yield store
@@ -95,6 +109,14 @@ def test_flujo_diario_idempotencia_no_duplica(clean_test_store):
     assert res2.recordatorios_existentes_omitidos == nuevos_primera
 
 
+def test_lista_vacia_no_se_sustituye_por_perfiles_de_demo(clean_test_store):
+    resumen = ejecutar_tarea_diaria_recordatorios(
+        fecha_referencia=date(2026, 7, 20), contribuyentes=[], store=clean_test_store,
+    )
+    assert resumen.contribuyentes_evaluados == 0
+    assert resumen.recordatorios_nuevos_generados == 0
+
+
 def test_compuerta_humana_confirmacion_despacho(clean_test_store):
     """
     Verifica el flujo HITL completo:
@@ -128,6 +150,9 @@ def test_compuerta_humana_confirmacion_despacho(clean_test_store):
     assert despacho.estado == "ENVIADO"
     assert despacho.confirmado is True
     assert despacho.id_registro_auditoria is not None
+    assert despacho.usuario_confirmador == "contador_juan_perez"
+    stored = next(item for item in store.obtener_todos() if item["id_recordatorio"] == recordatorio_target.id_recordatorio)
+    assert stored["usuario_confirmador"] == "contador_juan_perez"
 
     # Después de confirmar: ya no figura en la lista de pendientes
     pendientes_despues = listar_recordatorios_pendientes(store=store)
@@ -157,22 +182,15 @@ def test_confirmacion_todos_los_pendientes_en_lote(clean_test_store):
     assert len(listar_recordatorios_pendientes(store=store)) == 0
 
 
-def test_router_endpoints_flujo():
+def test_router_endpoints_flujo(tmp_path, monkeypatch):
     """Verifica que las funciones del router /api/flujo respondan con sus esquemas tipados."""
+    monkeypatch.setattr("backend.services.scheduler._STORE_GLOBAL", SQLiteStore(tmp_path / "rimpe.sqlite3", None))
     # 1. Disparar tarea diaria
     res_tarea = endpoint_ejecutar_tarea_diaria(EjecutarFlujoRequest(fecha_simulada="2026-07-20"))
-    assert res_tarea.contribuyentes_evaluados >= 1
+    assert res_tarea.contribuyentes_evaluados == 0
 
     # 2. Listar pendientes
     pendientes = endpoint_listar_recordatorios_pendientes()
     assert isinstance(pendientes, list)
 
-    # 3. Si hay pendientes, confirmar uno
-    if pendientes:
-        id_primero = pendientes[0].id_recordatorio
-        res_conf = endpoint_confirmar_recordatorio(
-            id_recordatorio=id_primero,
-            payload=ConfirmarRecordatorioRequest(usuario_confirmador="auditor_test")
-        )
-        assert res_conf.estado == "ENVIADO"
-        assert res_conf.confirmado is True
+    assert pendientes == []

@@ -49,6 +49,7 @@ PALABRAS_FUERA_DOMINIO = [
 PALABRAS_PROHIBIDAS_EVASION = [
     "evadir", "evasión", "evasion", "defraudar", "defraudación", "defraudacion",
     "no pagar", "ocultar ingresos", "factura falsa", "facturas falsas", "lavado",
+    "omitir facturas", "no facturar", "ocultar facturas",
     "trampa", "engañar al sri", "enganar al sri"
 ]
 
@@ -103,7 +104,7 @@ class MotorRAG:
                 from scripts.ingest import ejecutar_pipeline_ingesta
                 ejecutar_pipeline_ingesta(generar_embeddings=False)
             except Exception as e:
-                logger.error(f"No se pudo generar rag_chunks.json: {e}")
+                logger.error("No se pudo generar rag_chunks.json: %s", type(e).__name__)
                 self.chunks = []
                 return
 

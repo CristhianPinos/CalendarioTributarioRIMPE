@@ -8,7 +8,9 @@ Verifica el cumplimiento de la restricción:
 """
 
 import pytest
+import yaml
 from pathlib import Path
+from backend.services.agent_service import CalcularIVAInput, tool_calcular_iva
 from backend.services.config_loader import (
     load_parametros,
     get_salario_basico_unificado,
@@ -89,3 +91,21 @@ def test_parametros_agente_flujo():
     assert params["dias_anticipacion_alerta_diaria"] == 5
     assert params["max_iteraciones_agente"] == 5
     assert params["requiere_confirmacion_humana"] is True
+
+
+def test_tarifa_se_actualiza_desde_yaml_aislado(tmp_path, monkeypatch):
+    """Prueba el desacoplamiento sin alterar las tarifas oficiales del proyecto."""
+    original = get_config_path()
+    config = yaml.safe_load(original.read_text(encoding="utf-8"))
+    config["tarifas_iva"]["general"] = 0.17  # Valor hipotético solo en archivo temporal.
+    temporary_config = tmp_path / "parametros-prueba.yaml"
+    temporary_config.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
+    monkeypatch.setenv("SRI_CONFIG_PATH", str(temporary_config))
+    try:
+        load_parametros(reload=True)
+        result = tool_calcular_iva(CalcularIVAInput(base_imponible=100))
+        assert result.tarifa_aplicada == 0.17
+        assert result.monto_iva == 17.0
+    finally:
+        monkeypatch.delenv("SRI_CONFIG_PATH", raising=False)
+        load_parametros(reload=True)

@@ -12,6 +12,7 @@ Este documento recopila las Decisiones de Arquitectura de Software (**Architectu
 - [ADR-004: Inmutabilidad de Fechas y Esquema Estructurado Pydantic v2](#adr-004-inmutabilidad-de-fechas-y-esquema-estructurado-pydantic-v2)
 - [ADR-005: Anonimización y Auditoría Conforme a la LOPDP Ecuatoriana](#adr-005-anonimización-y-auditoría-conforme-a-la-lopdp-ecuatoriana)
 - [ADR-006: Desacoplamiento Total de Reglas Tributarias en Archivo Versionado](#adr-006-desacoplamiento-total-de-reglas-tributarias-en-archivo-versionado)
+- [ADR-007: Render Free como demostración sin persistencia](#adr-007-render-free-como-demostración-sin-persistencia)
 
 ---
 
@@ -138,3 +139,27 @@ Todos los parámetros tributarios se extrajeron a [`config/sri_rules_2026.json`]
 ### Consecuencias
 * **Positivas:** 0% de coeficientes "quemados" en el código fuente. La actualización anual solo requiere editar el archivo JSON sin tocar la lógica de negocio.
 * **Negativas:** El backend debe validar la existencia e integridad del JSON al arrancar (implementado en el endpoint `/health`).
+## ADR-007: Render Free como demostración sin persistencia
+
+**Fecha:** 7 de noviembre de 2026. **Estado:** Aprobada para la demostración de fase 4.
+
+### Contexto
+
+La hoja de ruta pide Render Free. La etapa 5 trasladó perfiles y cola a SQLite para preservar consentimiento y estados. [Render documenta](https://render.com/docs/free) que el sistema de archivos del plan Free se pierde al reiniciar, redesplegar o suspender el servicio; además, lo suspende tras un período de inactividad. Un despliegue Free con registro de contribuyentes daría una falsa expectativa de persistencia y no ejecutaría de forma fiable el escaneo diario.
+
+### Decisión
+
+Se ofrece una demostración pública **sin perfiles persistentes ni envíos**: `render.yaml` configura `RIMPE_DEMO_READONLY=true`, `SCHEDULER_ENABLED=false` y no contiene credenciales SMTP ni de operador. El backend bloquea el registro de perfiles y el frontend muestra el alcance de la demostración. El cálculo tributario continúa en Python, el índice RAG se empaqueta en la imagen y Gemini sigue encargado de las explicaciones cuando exista una clave configurada. Frontend y API se sirven desde un solo origen en el contenedor. `Dockerfile` usa un usuario sin privilegios y no copia el archivo `.env` ni la cola JSON histórica.
+
+Para operar el flujo completo con datos personales y recordatorios persistentes en Render se necesitará un servicio de pago con [disco persistente](https://render.com/docs/disks) montado sobre la ruta de `RIMPE_DB_PATH`, una sola instancia del planificador, HTTPS y secretos de operador y SMTP gestionados en la plataforma. Esa opción no forma parte de la demostración Free autorizada.
+
+### Consecuencias y controles
+
+- La URL Free permite pruebas públicas de calendario, RAG, respuestas y salud. Las pruebas de correo real y permanencia tras reinicio requieren un entorno con almacenamiento duradero y buzón de prueba.
+- El contenedor empaqueta `rag_chunks.json`, que se recupera en cada arranque sin escribir datos personales.
+- El mismo Dockerfile puede usarse con un volumen privado persistente para el sistema completo. La configuración Free no habilita el escaneo ni el alta de perfiles.
+- Se conserva el nombre **ADR-007** porque `ADR-003` ya identifica la estrategia de resiliencia; la numeración `ADR-0003` de la hoja de ruta habría colisionado.
+
+### Decisiones éticas relacionadas
+
+La minimización de datos de la etapa 3 y la aprobación HITL de la etapa 1 se aplican a cualquier despliegue persistente. Las consultas de evasión se rechazan por la compuerta del RAG con cita del Código Tributario. Estas medidas son controles verificables del software; no sustituyen una revisión jurídica ni una auditoría independiente.

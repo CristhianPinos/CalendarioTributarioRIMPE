@@ -15,20 +15,71 @@ import os
 import sys
 import json
 import logging
+import argparse
+import time
+import math
+from statistics import median
 from datetime import datetime, timezone
 from typing import Dict, Any, List
+from types import SimpleNamespace
+
+import requests
 
 # Asegurar path al backend
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from backend.services.agent_service import tool_calcular_vencimientos, CalcularVencimientosInput
-from backend.services.rag_service import responder_con_rag
+from backend.services.rag_service import responder_con_rag, ConsultaRAGResponse
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-logger = logging.getLogger("evaluacion_semana3")
+logger = logging.getLogger("evaluacion_rimpe")
 
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "dataset_evaluacion.json")
 RESULTADOS_PATH = os.path.join(os.path.dirname(__file__), "resultados_evaluacion.json")
+BASE_URL = None
+LATENCIES = {"calculo": [], "rag": []}
+
+
+def latency_summary(values):
+    ordered = sorted(values)
+    if not ordered:
+        return {"p50_ms": None, "p95_ms": None}
+    return {
+        "p50_ms": round(median(ordered), 2),
+        "p95_ms": round(ordered[math.ceil(len(ordered) * 0.95) - 1], 2),
+    }
+
+
+def calcular_perfil(params):
+    """Ejecuta el cálculo local o consulta la API desplegada."""
+    started = time.perf_counter()
+    try:
+        if BASE_URL is None:
+            return tool_calcular_vencimientos(params)
+        response = requests.post(
+            BASE_URL + "/api/perfil/calcular-vencimientos",
+            json=params.model_dump(), timeout=90,
+        )
+        response.raise_for_status()
+        return SimpleNamespace(**response.json())
+    finally:
+        LATENCIES["calculo"].append((time.perf_counter() - started) * 1000)
+
+
+def consultar_rag(pregunta, regimen, top_k):
+    """Consulta el RAG local o la API desplegada con el mismo dataset."""
+    started = time.perf_counter()
+    try:
+        if BASE_URL is None:
+            return responder_con_rag(pregunta=pregunta, regimen=regimen, top_k=top_k)
+        response = requests.post(
+            BASE_URL + "/api/rag/consultar",
+            json={"pregunta": pregunta, "regimen": regimen, "top_k": top_k}, timeout=90,
+        )
+        response.raise_for_status()
+        return ConsultaRAGResponse.model_validate(response.json())
+    finally:
+        LATENCIES["rag"].append((time.perf_counter() - started) * 1000)
 
 
 def evaluar_perfiles_referencia(perfiles: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -57,7 +108,7 @@ def evaluar_perfiles_referencia(perfiles: List[Dict[str, Any]]) -> Dict[str, Any
             anio=anio,
             tiene_actividades_excluidas=excluidas
         )
-        res = tool_calcular_vencimientos(params)
+        res = calcular_perfil(params)
         fechas_calculadas = {ev["codigo_obligacion"]: ev["fecha_vencimiento"] for ev in res.eventos}
 
         # Comparar con esperadas
@@ -134,7 +185,7 @@ def evaluar_preguntas_normativas(preguntas: List[Dict[str, Any]]) -> Dict[str, A
         art_esp = q.get("articulo_esperado")
         articulos_validos = q.get("articulos_validos", [art_esp] if art_esp else [])
 
-        res_rag = responder_con_rag(pregunta=texto, regimen=regimen, top_k=3)
+        res_rag = consultar_rag(pregunta=texto, regimen=regimen, top_k=3)
         se_abstuvo = res_rag.se_abstuvo
         citas = [c.cita_oficial for c in res_rag.citas]
         docs = [c.documento for c in res_rag.citas]
@@ -233,7 +284,11 @@ def evaluar_preguntas_normativas(preguntas: List[Dict[str, Any]]) -> Dict[str, A
     }
 
 
-def ejecutar_evaluacion():
+def ejecutar_evaluacion(base_url=None, output=RESULTADOS_PATH):
+    global BASE_URL
+    BASE_URL = base_url.rstrip("/") if base_url else None
+    LATENCIES["calculo"].clear()
+    LATENCIES["rag"].clear()
     print("=" * 80)
     print("EVALUACIÓN FORMAL DE CALIDAD, AGENTE Y RAG (FASE 3 - GRUPO 11)")
     print("Calendario Tributario Personalizado para Emprendedores RIMPE - SRI 2026")
@@ -268,7 +323,8 @@ def ejecutar_evaluacion():
     resultados_completos = {
         "timestamp_evaluacion": datetime.now(timezone.utc).isoformat(),
         "caso": "Caso N.º 11 - Calendario Tributario RIMPE",
-        "evaluacion_version": "3.0.0",
+        "evaluacion_version": "4.0.0",
+        "origen_evaluacion": BASE_URL or "local",
         "resumen_ejecutivo": {
             "perfiles_evaluados": eval_perfiles["total_perfiles"],
             "precision_perfiles_pct": eval_perfiles["precision_perfiles_pct"],
@@ -280,16 +336,24 @@ def ejecutar_evaluacion():
             "fugas_seguridad_fn": eval_preguntas["matriz_confusion_abstencion"]["FN"],
             "falsos_rechazos_fp": eval_preguntas["matriz_confusion_abstencion"]["FP"]
         },
+        "latencias": {
+            "calculo": latency_summary(LATENCIES["calculo"]),
+            "rag": latency_summary(LATENCIES["rag"]),
+        },
         "perfiles_referencia": eval_perfiles,
         "preguntas_normativas": eval_preguntas
     }
 
-    with open(RESULTADOS_PATH, "w", encoding="utf-8") as f:
+    with open(output, "w", encoding="utf-8") as f:
         json.dump(resultados_completos, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[OK] Resultados exportados exitosamente a: {RESULTADOS_PATH}")
+    print(f"\n[OK] Resultados exportados exitosamente a: {output}")
     print("=" * 80)
 
 
 if __name__ == "__main__":
-    ejecutar_evaluacion()
+    parser = argparse.ArgumentParser(description="Evaluación reproducible local o contra una URL desplegada.")
+    parser.add_argument("--base-url", help="URL base de la API desplegada; omitir para evaluación local.")
+    parser.add_argument("--output", default=RESULTADOS_PATH, help="Archivo JSON de resultados.")
+    args = parser.parse_args()
+    ejecutar_evaluacion(args.base_url, args.output)

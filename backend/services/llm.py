@@ -21,7 +21,6 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log,
     RetryError
 )
 
@@ -242,7 +241,6 @@ def _enviar_http_gemini(url: str, payload: Dict[str, Any], timeout_sec: float) -
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=4),
     retry=retry_if_exception_type((GeminiRateLimitException, GeminiServiceUnavailableException, httpx.TimeoutException)),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
     reraise=True
 )
 def _invocar_gemini_raw(
@@ -419,7 +417,7 @@ def generar_explicacion_obligacion(
         )
 
     except (RetryError, GeminiAPIException, Exception) as err:
-        logger.error(f"Fallo en llamada a Gemini tras reintentos ({err}). Activando fallback determinista de alta disponibilidad.")
+        logger.error("Fallo en llamada a Gemini tras reintentos (%s). Activando fallback determinista.", type(err).__name__)
         recordatorio = obtener_fallback_determinista(
             request.codigo_obligacion,
             request.fecha_vencimiento,

@@ -36,8 +36,8 @@ def consultar_normativa_rag(payload: ConsultaRAGRequest):
             top_k=payload.top_k
         )
         return resultado
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
-            detail=f"Error en el motor RAG de consulta normativa: {str(e)}"
+            detail="No se pudo procesar la consulta normativa."
         )

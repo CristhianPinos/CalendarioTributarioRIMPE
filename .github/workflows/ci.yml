@@ -2,7 +2,7 @@ name: CI - Pruebas y Evaluación
 
 on:
   push:
-    branches: [ main, "feature/**" ]
+    branches: [ main, "feature/**", "codex/**" ]
   pull_request:
     branches: [ main ]
 
@@ -50,3 +50,6 @@ jobs:
         GEMINI_API_KEY: "dummy-key-para-ci"
       run: |
         python eval/run_eval.py
+
+    - name: Construir imagen Docker de producción
+      run: docker build -t calendario-rimpe:ci .

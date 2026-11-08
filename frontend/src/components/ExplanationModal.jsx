@@ -41,6 +41,8 @@ export default function ExplanationModal({
   const [recordatorioProgramado, setRecordatorioProgramado] = useState(false);
   const [enviandoHitl, setEnviandoHitl] = useState(false);
   const [resultadoAgente, setResultadoAgente] = useState(null);
+  const [operatorUser, setOperatorUser] = useState("");
+  const [operatorPassword, setOperatorPassword] = useState("");
 
   // Cargar explicación cada vez que se abre el modal con una nueva obligación
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function ExplanationModal({
       setRecordatorioProgramado(false);
       setConfirmadoPorUsuario(false);
       setResultadoAgente(null);
+      setOperatorPassword("");
       return;
     }
 
@@ -101,7 +104,7 @@ export default function ExplanationModal({
 
   const handleProgramarRecordatorio = async (e) => {
     e.preventDefault();
-    if (!confirmadoPorUsuario) return;
+    if (!confirmadoPorUsuario || !operatorUser.trim() || !operatorPassword) return;
 
     setEnviandoHitl(true);
     setError(null);
@@ -120,10 +123,15 @@ export default function ExplanationModal({
         },
         base_imponible_iva: obligacion.codigo_obligacion?.includes("IVA") ? 1000.0 : null,
         confirmacion_envio: true, // Compuerta HITL aprobada por el usuario
+        operatorCredentials: { username: operatorUser.trim(), password: operatorPassword },
       });
 
+      if (!res.data.exito) {
+        throw new Error(res.data.respuesta_final || "No se pudo completar la operación.");
+      }
       setResultadoAgente(res.data);
       setRecordatorioProgramado(true);
+      setOperatorPassword("");
     } catch (err) {
       setError(
         err.message || "No se pudo procesar la ejecución del agente tributario."
@@ -360,15 +368,21 @@ export default function ExplanationModal({
 
                 {recordatorioProgramado ? (
                   <div className="space-y-3 animate-in fade-in duration-200">
-                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-start space-x-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div className={`p-4 border rounded-2xl text-xs flex items-start space-x-3 ${resultadoAgente?.estado_envio === "ENVIADO" ? "bg-emerald-50 border-emerald-200 text-emerald-900" : "bg-amber-50 border-amber-200 text-amber-900"}`}>
+                      <CheckCircle2 className={`w-5 h-5 flex-shrink-0 mt-0.5 ${resultadoAgente?.estado_envio === "ENVIADO" ? "text-emerald-600" : "text-amber-600"}`} />
                       <div className="space-y-1">
-                        <p className="font-bold text-emerald-950">
-                          ¡Recordatorio Autorizado y Despachado por el Agente!
+                        <p className="font-bold">
+                          {resultadoAgente?.estado_envio === "ENVIADO"
+                            ? "Recordatorio aceptado por el servidor SMTP"
+                            : resultadoAgente?.estado_envio === "SIMULADO"
+                            ? "Aprobación registrada en modo simulación; no se envió correo"
+                            : resultadoAgente?.estado_envio === "ESTADO_INCIERTO"
+                            ? "Resultado SMTP incierto; requiere revisión antes de reintentar"
+                            : "El correo no se envió; revise la configuración o reintente"}
                         </p>
-                        <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        <p className="text-[11px] leading-relaxed">
                           {resultadoAgente?.respuesta_final ||
-                            `El recordatorio fue confirmado mediante la compuerta HITL y enviado satisfactoriamente a ${emailDestino}.`}
+                            `Se procesó la solicitud para ${emailDestino}.`}
                         </p>
                         {resultadoAgente?.trazas_herramientas && (
                           <p className="text-[10px] font-mono text-emerald-700 pt-1">
@@ -403,6 +417,30 @@ export default function ExplanationModal({
                   </div>
                 ) : (
                   <form onSubmit={handleProgramarRecordatorio} className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <label className="text-[11px] font-bold text-slate-600">
+                        Usuario operador
+                        <input
+                          type="text"
+                          autoComplete="username"
+                          required
+                          value={operatorUser}
+                          onChange={(e) => setOperatorUser(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                        />
+                      </label>
+                      <label className="text-[11px] font-bold text-slate-600">
+                        Contraseña operador
+                        <input
+                          type="password"
+                          autoComplete="current-password"
+                          required
+                          value={operatorPassword}
+                          onChange={(e) => setOperatorPassword(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                        />
+                      </label>
+                    </div>
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                         Correo de Notificación
@@ -435,9 +473,9 @@ export default function ExplanationModal({
 
                     <button
                       type="submit"
-                      disabled={!confirmadoPorUsuario || enviandoHitl}
+                      disabled={!confirmadoPorUsuario || !operatorUser.trim() || !operatorPassword || enviandoHitl}
                       className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
-                        confirmadoPorUsuario && !enviandoHitl
+                        confirmadoPorUsuario && operatorUser.trim() && operatorPassword && !enviandoHitl
                           ? "bg-blue-700 hover:bg-blue-800 text-white shadow-sm hover:shadow cursor-pointer"
                           : "bg-slate-300 text-slate-500 cursor-not-allowed"
                       }`}

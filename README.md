@@ -1,227 +1,117 @@
-# Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE
+# Calendario Tributario RIMPE
 
-> **Plataforma Inteligente de Cumplimiento Fiscal con Agente RAG Normativo y Automatización Programada de Notificaciones (Human-in-the-Loop)**
+Aplicación académica del Caso 11, Grupo 11, UNIANDES. Genera un calendario para contribuyentes RIMPE de Ecuador, explica obligaciones con Gemini y documentos normativos, y prepara recordatorios sujetos a consentimiento y aprobación humana.
 
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI_v2.0-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat&logo=python)](https://www.python.org/)
-[![React](https://img.shields.io/badge/Frontend-React_19-61DAFB.svg?style=flat&logo=react)](https://react.dev/)
-[![TailwindCSS](https://img.shields.io/badge/Styling-Tailwind_CSS_v4-38B2AC.svg?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
-[![FullCalendar](https://img.shields.io/badge/UI-FullCalendar-black.svg?style=flat)](https://fullcalendar.io/)
-[![SRI Ecuador](https://img.shields.io/badge/Normativa-SRI_Ecuador-red.svg?style=flat)](https://www.sri.gob.ec)
-[![Tests](https://img.shields.io/badge/Tests-120%20Passing-brightgreen.svg?style=flat)](backend/tests/)
+**Estado de la fase 4:** imagen y configuración de despliegue preparadas; [pruebas HTTP locales](docs/08-pruebas-local.md) ejecutadas. **URL pública:** pendiente de publicación y verificación en Render. La demostración Free no guarda perfiles ni envía correos.
 
----
+## Problema y solución
 
-## 📋 Metadatos del Proyecto
-* **Carrera:** Ingeniería de Software
-* **Asignatura:** Ingeniería de Software con IA Generativa: Desarrollo de Aplicaciones Inteligentes
-* **Caso de Estudio:** Caso N.º 11 – Grupo 11
-* **Tipo de Producto:** Automatización de procesos con agente de alcance controlado y RAG
-* **Fase Actual:** Fase 2 – Construcción del MVP e integración con IA generativa (Semana 2)
-
----
-
-## 📌 1. Descripción del Problema y Solución
-
-En Ecuador, cientos de miles de emprendedores y personas de negocios populares inscritos en el **Régimen Simplificado para Emprendedores y Negocios Populares (RIMPE)** desconocen sus fechas límite de declaración, los comprobantes válidos que deben emitir y las tarifas vigentes. Aunque el Servicio de Rentas Internas (**SRI**) publica resoluciones y guías, su lenguaje técnico y las reglas cambiantes del noveno dígito del RUC generan atrasos sancionados con multas e intereses.
-
-### La Solución:
-Una aplicación web híbrida con **interfaz principal centrada en Calendario** (no un chatbot abierto) que:
-1. **Perfilamiento y Validación:** Registra el perfil del contribuyente validando su RUC en tiempo real mediante el algoritmo Módulo 10 de personas naturales.
-2. **Cálculo Determinista Inmutable:** Computa las fechas exactas de declaración de IVA y Renta por noveno dígito y feriados de Ecuador sin intervención probabilística del LLM (cero alucinaciones).
-3. **Agente Pedagógico RAG:** Al interactuar con el calendario, Google Gemini Flash consulta los 7 PDFs oficiales del SRI indexados y redacta explicaciones didácticas en lenguaje ciudadano bajo esquemas Pydantic estrictos (`RecordatorioEstructurado`).
-4. **Flujo Programado con Compuerta Humana (*Human-in-the-Loop*):** Un planificador de recordatorios detecta vencimientos a $T - 5$ días. Ningún correo sale sin la confirmación explícita del usuario (`confirmado_por_usuario == True`).
-5. **Simulador de Impuesto a la Renta:** Simula de forma determinista la cuota fija o la tarifa progresiva de Renta según el Art. 23 de la Ley de Eficiencia Económica (R.O. Suplemento 461).
-
----
-
-## 🏛️ 2. Arquitectura del Sistema (Resumen C4)
+Los vencimientos dependen del noveno dígito del RUC, el régimen, el período y los días inhábiles. Una fecha incorrecta puede inducir a incumplimiento. El motor Python calcula fechas y montos a partir de [`config/`](config/). Gemini redacta explicaciones; el RAG aporta citas de los documentos procesados. Un operador autenticado revisa cada recordatorio antes de despacharlo.
 
 ```mermaid
 flowchart LR
-    subgraph Frontend["SPA React 19 + Vite + FullCalendar"]
-        UI_Form["ProfileForm.jsx<br>(Módulo 10)"]
-        UI_Cal["CalendarView.jsx<br>(FullCalendar Mensual)"]
-        UI_Modal["ExplanationModal.jsx<br>(Gemini Flash)"]
-        UI_Sim["TaxSimulatorModal.jsx<br>(Ley Eficiencia)"]
-    end
-
-    subgraph Backend["API FastAPI + Python"]
-        API["Routers REST (/api)"]
-        DetEngine["Motor Determinista<br>(calculator.py)"]
-        RAGAgent["Servicio IA Gemini Flash<br>(llm.py + Tenacity)"]
-        Gatekeeper["Compuerta HITL<br>(Consentimiento Correo)"]
-        Middleware["Logging LOPDP<br>(PII Masking & Latency)"]
-    end
-
-    subgraph Datos["Datos & Servicios Externos"]
-        SRI_JSON["config/sri_rules_2026.json"]
-        PDFs["data/raw/ (7 PDFs Oficiales)"]
-        LLM["API Google Gemini Flash"]
-    end
-
-    Frontend --> API
-    API --> Middleware
-    API --> DetEngine
-    DetEngine --> SRI_JSON
-    API --> RAGAgent
-    RAGAgent --> PDFs
-    RAGAgent --> LLM
-    API --> Gatekeeper
+  UI[React y Vite] --> API[FastAPI]
+  API --> CALC[Cálculo Python]
+  API --> RAG[RAG sobre artículos]
+  API --> GEM[Gemini o catálogo de contingencia]
+  API --> DB[(SQLite: perfiles y cola)]
+  DB --> HITL[Revisión del operador]
+  HITL --> SMTP[SMTP]
 ```
 
-Para consultar los diagramas C4 de Contexto, Contenedores y el diagrama de secuencia completo, revise el documento [`docs/03-arquitectura.md`](docs/03-arquitectura.md).
+Las fechas nunca las calcula el modelo. Los datos del formulario pueden utilizarse para generar el calendario sin guardarse. El escaneo periódico solo toma perfiles registrados con consentimiento de correo. El envío comprueba de nuevo ese consentimiento y requiere aprobación de un operador.
 
----
+## Ejecución local en unos diez minutos
 
-## 📂 3. Estructura del Repositorio
+Requisitos: Python 3.11 o 3.12, Node.js 22 y npm. En la raíz del repositorio:
 
-El proyecto sigue una arquitectura desacoplada, modular y 100% testeada:
-
-```text
-CalendarioTributarioRIMPE/
-├── .env.example                     # Plantilla pública de variables de entorno
-├── .gitignore                       # Exclusión de claves (.env), cachés y artefactos
-├── README.md                        # Guía de instalación, arquitectura y ejecución
-├── HANDOFF.md                       # Documento formal de traspaso de fase y contratos
-├── config/
-│   └── sri_rules_2026.json          # Reglas tributarias 2026 desacopladas (0% hardcoding)
-├── data/
-│   └── raw/                         # 7 Cuerpos normativos íntegros oficiales en PDF
-├── docs/                            # Documentación técnica, ADRs y evidencias
-│   ├── 01-propuesta.md              # Propuesta, alcance y matriz de riesgos
-│   ├── 02-requisitos.md             # 10 Historias de usuario Gherkin y 7 RNF medibles
-│   ├── 03-arquitectura.md           # Diagramas C4 y arquitectura del sistema
-│   ├── 04-fuentes.md                # Catálogo de los 7 PDFs oficiales del SRI
-│   ├── 05-prompts.md                # Benchmark de prompts (v1, v2, v3) y matriz de evaluación
-│   ├── 09-decisiones.md             # Registro formal de 6 ADRs arquitectónicos
-│   ├── levantamiento-preguntas.md   # 16 casos reales de contribuyentes ecuatorianos
-│   └── evidencias/
-│       ├── semana-1/                # Bitácora y decisiones de Fase 1
-│       │   ├── bitacora-semana-1.md
-│       │   └── decisiones-semana-1.md
-│       └── semana-2/                # Bitácora y decisiones de Fase 2
-│           ├── bitacora-semana-2.md
-│           └── decisiones-semana-2.md
-├── backend/                         # Servidor API REST en FastAPI
-│   ├── main.py                      # Punto de entrada FastAPI, CORS y middleware LOPDP
-│   ├── requirements.txt             # Dependencias del backend (FastAPI, Gemini, Tenacity, Pytest)
-│   ├── schemas.py                   # Modelos y contratos de datos Pydantic v2
-│   ├── middleware/
-│   │   └── logging_lopdp.py         # Middleware de auditoría y enmascaramiento de PII
-│   ├── prompts/                     # Plantillas versionadas de prompts del sistema
-│   │   ├── system_v1.md             # Prompt v1 (Naïve)
-│   │   ├── system_v2.md             # Prompt v2 (Intermedio)
-│   │   └── system_v3.md             # Prompt v3 (Producción - Zero Date Hallucination)
-│   ├── routers/
-│   │   ├── calendario_router.py     # Endpoints de cálculo de calendario, feriados y RUC
-│   │   └── obligaciones_router.py   # Endpoints de explicación con IA y simulador de renta
-│   ├── services/
-│   │   ├── calculator.py            # Motor determinista (Módulo 10, 9no dígito, feriados)
-│   │   └── llm.py                   # Servicio Gemini Flash con reintentos Tenacity y Fail-Safe
-│   └── tests/                       # Suite de pruebas automatizadas (120 tests - 100% Green)
-│       ├── test_calculator.py       # 64 tests unitarios del motor determinista
-│       ├── test_schemas.py          # 11 tests unitarios de esquemas Pydantic v2
-│       ├── test_llm_service.py      # 10 tests unitarios del servicio de IA y contingencia
-│       ├── test_routers_and_middleware.py # 13 tests de endpoints y middleware LOPDP
-│       ├── test_api_mock.py         # 8 tests de integración con mocks offline
-│       ├── test_calendario_router.py # 9 tests del router de calendario y feriados
-│       └── test_e2e_integration.py  # 5 tests de integración End-to-End
-└── frontend/                        # Aplicación Single Page Application (SPA)
-    ├── package.json                 # Dependencias (React 19, Vite, Tailwind CSS, FullCalendar)
-    ├── vite.config.js               # Configuración de Vite y Tailwind v4
-    ├── index.html                   # Entrada web institucional en español
-    └── src/
-        ├── main.jsx                 # Montaje de la aplicación React
-        ├── App.jsx                  # Orquestador principal y layout responsive
-        ├── index.css                # Estilos globales y personalización de FullCalendar
-        ├── utils/
-        │   └── rucValidator.js      # Validador client-side de RUC Módulo 10 (Ecuador)
-        ├── services/
-        │   └── apiClient.js         # Cliente HTTP hacia FastAPI con control de errores
-        └── components/
-            ├── Navbar.jsx           # Cabecera con monitor de estado de API en vivo
-            ├── ProfileForm.jsx      # Formulario de perfil con feedback visual de RUC
-            ├── CalendarView.jsx     # Cuadrícula interactiva FullCalendar y lista de eventos
-            ├── ExplanationModal.jsx # Modal didáctico con IA Gemini y compuerta HITL
-            ├── TaxSimulatorModal.jsx # Modal simulador de Impuesto a la Renta progresivo
-            └── Footer.jsx           # Pie de página institucional y cumplimiento LOPDP
+```powershell
+Copy-Item .env.example .env
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r backend/requirements.txt
 ```
 
----
+Edite `.env` para añadir `GEMINI_API_KEY` si necesita respuestas generativas en vivo. Sin clave, el servicio usa su catálogo de contingencia. Para registrar perfiles y aprobar correos, configure además `REMINDER_OPERATOR_USER` y una contraseña única de al menos 16 caracteres. El archivo [`.env.example`](.env.example) describe las variables; `.env` está excluido de Git.
 
-## 🚀 4. Guía de Ejecución Local (Paso a Paso)
+Abra dos terminales desde la raíz:
 
-### Requisitos del Sistema:
-* **Python 3.10 o superior** (probado y certificado en Python 3.14).
-* **Node.js 18+ y npm** (probado con Node v24 y npm 11).
-* **Clave de API de Google Gemini** (Google AI Studio).
-
----
-
-### Terminal 1: Iniciar el Servidor Backend (FastAPI)
-
-```bash
-# 1. Instalar las dependencias de Python
-pip install -r backend/requirements.txt
-
-# 2. Configurar la clave de API en el archivo .env
-# (Asegúrate de tener tu archivo .env en la raíz con tu GEMINI_API_KEY)
-# Ejemplo:
-# GEMINI_API_KEY=tu_clave_de_google_ai_studio
-# GEMINI_MODEL=gemini-3-flash-preview
-
-# 3. Ejecutar las 120 pruebas automatizadas para certificar el estado
-python -m pytest backend/tests/ -v
-
-# 4. Iniciar el servidor backend en desarrollo
-uvicorn backend.main:app --reload --port 8000
+```powershell
+# Terminal 1
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-El backend quedará operativo en:
-* **Documentación Interactiva (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Verificación de Salud (Health Check):** [http://localhost:8000/health](http://localhost:8000/health)
-
----
-
-### Terminal 2: Iniciar la Aplicación Frontend (React + Vite)
-
-```bash
-# 1. Entrar a la carpeta frontend
-cd frontend
-
-# 2. Instalar dependencias de Node.js (si no se han instalado previamente)
-npm install
-
-# 3. Iniciar el servidor de desarrollo de Vite
+```powershell
+# Terminal 2
+Set-Location frontend
+npm ci
 npm run dev
 ```
 
-La aplicación web abrirá en tu navegador en:
-👉 **[http://localhost:5173](http://localhost:5173)**
+Visite [http://localhost:5173](http://localhost:5173). El frontend de desarrollo redirige `/api` y `/health` al backend local. La API ofrece [documentación interactiva](http://localhost:8000/docs) y [salud](http://localhost:8000/health). `SCHEDULER_ENABLED=false` por defecto; active el planificador solo cuando tenga perfiles consentidos y una instancia con almacenamiento duradero.
 
----
+### Docker local
 
-## 🧪 5. Suite de Pruebas Automatizadas (QA)
+Con Docker Engine activo y `.env` creado:
 
-El proyecto cuenta con **120 pruebas automatizadas** con cobertura exhaustiva, ejecutables en ~10 segundos con `pytest`:
-
-```bash
-python -m pytest backend/tests/ -v
+```powershell
+docker compose up --build
 ```
 
-| Módulo de Prueba | Cantidad | Alcance Técnico |
-| :--- | :---: | :--- |
-| `test_calculator.py` | 64 | Algoritmo Módulo 10 de RUC, 10 novenos dígitos, prórrogas por fines de semana y feriados del SRI. |
-| `test_schemas.py` | 11 | Validación de tipos Pydantic v2, límites de longitud y esquema `RecordatorioEstructurado`. |
-| `test_llm_service.py` | 10 | Servicio Gemini Flash, 5 plantillas del catálogo de contingencia y reintentos Tenacity. |
-| `test_routers_and_middleware.py` | 13 | Endpoints de FastAPI, middleware LOPDP de enmascaramiento de PII y cabeceras `X-Process-Time-Ms`. |
-| `test_api_mock.py` | 8 | Pruebas de integración de la API con mocks offline (Happy Path, 422, 429 y 503). |
-| `test_calendario_router.py` | 9 | Endpoints de cálculo de calendario, feriados oficiales y validación rápida de RUC. |
-| `test_e2e_integration.py` | 5 | Pruebas End-to-End completas de los 4 flujos de usuario e integridad del build de frontend. |
-| **TOTAL** | **120** | **100% Passed (Green)** |
+Visite [http://localhost:8000](http://localhost:8000). `compose.yaml` conserva SQLite en el volumen `rimpe-data`. La imagen compila React, sirve frontend y API desde el mismo origen, escucha `${PORT}` y ejecuta Uvicorn con un usuario sin privilegios. No incluye `.env`, la cola JSON histórica ni datos personales. Para restaurar un respaldo SQLite, detenga la aplicación y copie una base validada al volumen antes de iniciar de nuevo. Proteja el volumen y cualquier respaldo con permisos de acceso adecuados.
 
----
+## Despliegue de demostración en Render Free
 
-## ⚖️ Licencia y Responsabilidad Legal
-Este proyecto fue desarrollado con fines estrictamente formativos dentro de la asignatura de **Ingeniería de Software con IA Generativa**. La plataforma **no sustituye la asesoría legal o contable de un Contador Público Autorizado (CPA)** ni realiza declaraciones tributarias autónomas ante el SRI.
+[`render.yaml`](render.yaml) declara un único Web Service Docker con `/health`. Configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`. El registro de perfiles está bloqueado y no se configuran credenciales de operador ni SMTP. La demostración permite verificar calendario, RAG y explicaciones sin conservar datos personales.
+
+Para desplegar: conecte este repositorio en Render, seleccione Blueprint y revise las variables del servicio. Configure `GEMINI_API_KEY` como secreto en Render solo si desea usar Gemini en vivo; la clave nunca debe entrar en Git. Publique la rama verificada, espere el build y compruebe `/health` y los [casos HTTP](docs/08-pruebas.md). La URL debe añadirse aquí **solo después** de una comprobación real.
+
+[Render Free usa un sistema de archivos efímero](https://render.com/docs/free) y suspende el servicio por inactividad. Por ello esta configuración es una demostración, no el despliegue de recordatorios persistentes. Para el flujo completo se requiere un servicio con [disco persistente](https://render.com/docs/disks) o una base duradera, más secretos de operador y SMTP, HTTPS y un único planificador. Véase [ADR-007](docs/09-decisiones.md).
+
+## Pruebas y evaluación
+
+```powershell
+python -m pytest backend/tests/ -q
+python eval/run_eval.py --output eval/resultados_semana4_local.json
+python scripts/production_checks.py --base-url http://localhost:8000 --output docs/08-pruebas-local.md
+```
+
+Tras desplegar, reemplace la URL por la pública y genere `docs/08-pruebas.md`. Para comparar el mismo dataset por HTTP:
+
+```powershell
+python eval/run_eval.py --base-url https://SU-SERVICIO.onrender.com --output eval/resultados_evaluacion.json
+```
+
+La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Los resultados de la semana 3 se conservan en [`eval/resultados_semana3.json`](eval/resultados_semana3.json). La comparación documentada está en [`docs/07-evaluacion.md`](docs/07-evaluacion.md). La prueba de una tarifa hipotética modifica solo un YAML temporal; no altera las reglas tributarias oficiales del repositorio.
+
+## Privacidad, autorización y límites
+
+- Las rutas `/api/perfiles` y `/api/flujo` exigen autenticación de operador. El consentimiento de correo empieza desactivado y puede revocarse. La base SQLite y los respaldos contienen datos personales; no se publican.
+- Los logs no incluyen RUC ni correo completos. `ENVIADO` significa aceptación por SMTP, no entrega o lectura. `ESTADO_INCIERTO` bloquea el reintento automático.
+- El índice RAG y las reglas fiscales reflejan los documentos y la configuración versionados. Deben verificarse contra nuevas publicaciones del SRI antes de usarse para otro ejercicio. No se cambian reglas tributarias por una respuesta del LLM.
+- La demostración Free no prueba persistencia tras reinicio, SMTP real ni el planificador diario. Tampoco sustituye la revisión de un profesional contable.
+- El servicio público aún no aplica una cuota de solicitudes por cliente. Véase la [matriz de riesgos](docs/riesgos.md).
+
+## Uso ético de IA generativa
+
+Gemini se usa para redactar explicaciones pedagógicas. Python conserva la autoridad sobre cálculos y fechas. El RAG exige citas o se abstiene; las consultas orientadas a evasión reciben rechazo. El agente no autoriza envíos por sí mismo. Los resultados pueden contener errores de interpretación y requieren contraste con las fuentes oficiales.
+
+## Aportes registrados
+
+| Integrante | Aportes verificables en el historial Git |
+| --- | --- |
+| Cristhian Pinos | Fundamentos y arquitectura; backend tributario y Gemini; pipeline RAG, agente, evaluación y CI (`77adf34`, `adcb736`, `ffb9c3e`, `50b09db`). |
+| Juan Lucumi | SPA React y calendario; refactor con `Decimal`, integración SMTP y formulario paso a paso (`c7cec18`, `31cdbed`). |
+
+Los cambios de seguridad, persistencia y fase 4 se documentan en el árbol de trabajo actual; esta tabla refleja commits publicados y no atribuye trabajo no verificado.
+
+## Documentación
+
+- [Arquitectura](docs/03-arquitectura.md)
+- [Fuentes normativas](docs/04-fuentes.md)
+- [RAG](docs/06-rag.md)
+- [Evaluación](docs/07-evaluacion.md)
+- [Decisiones técnicas](docs/09-decisiones.md)
+- [Automatización y respaldos](docs/10-automatizacion.md)
+- [Riesgos](docs/riesgos.md)

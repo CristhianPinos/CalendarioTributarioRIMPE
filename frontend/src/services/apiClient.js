@@ -4,7 +4,7 @@
  * Caso N.º 11 – Grupo 11
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 // Bandera para pruebas offline (por defecto en false para conectar con la API real en vivo)
 export const USE_MOCKS = false;
@@ -270,6 +270,7 @@ export async function ejecutarAgente({
   perfil,
   base_imponible_iva = null,
   confirmacion_envio = false,
+  operatorCredentials = null,
 }) {
   if (USE_MOCKS) {
     await new Promise((r) => setTimeout(r, 500));
@@ -290,11 +291,27 @@ export async function ejecutarAgente({
 
   return await apiRequest("/api/agente/ejecutar", {
     method: "POST",
+    headers: operatorCredentials
+      ? {
+          Authorization: `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${operatorCredentials.username}:${operatorCredentials.password}`)))}`,
+        }
+      : {},
     body: JSON.stringify({
       instruccion,
       perfil,
       base_imponible_iva,
       confirmacion_envio,
     }),
+  });
+}
+
+/** Registra un perfil para el escaneo diario con autorización explícita del operador. */
+export async function guardarPerfilRegistrado(perfilData, operatorCredentials) {
+  const credentials = `${operatorCredentials.username}:${operatorCredentials.password}`;
+  const authorization = btoa(String.fromCharCode(...new TextEncoder().encode(credentials)));
+  return await apiRequest("/api/perfiles", {
+    method: "POST",
+    headers: { Authorization: `Basic ${authorization}` },
+    body: JSON.stringify(perfilData),
   });
 }

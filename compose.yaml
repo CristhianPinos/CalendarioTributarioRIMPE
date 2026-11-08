@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      RIMPE_DB_PATH: /app/data/private/rimpe.sqlite3
+      RIMPE_DEMO_READONLY: "false"
+    volumes:
+      - rimpe-data:/app/data/private
+
+volumes:
+  rimpe-data:

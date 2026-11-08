@@ -9,15 +9,19 @@ Provee endpoints para:
 3. Confirmar y enviar recordatorios de forma individual o en lote.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from datetime import date
 from pydantic import BaseModel, Field
+from backend.operator_auth import require_operator
 
 from backend.services.scheduler import (
     ejecutar_tarea_diaria_recordatorios,
     listar_recordatorios_pendientes,
+    listar_recordatorios_en_revision,
     confirmar_y_despachar_recordatorio,
+    EnvioInciertoError,
+    ConsentimientoRequeridoError,
     confirmar_todos_los_pendientes,
     RecordatorioColaItem,
     ResumenTareaDiaria
@@ -26,7 +30,8 @@ from backend.services.agent_service import EnviarRecordatorioOutput
 
 router = APIRouter(
     prefix="/api/flujo",
-    tags=["Flujo Programado y Recordatorios HITL"]
+    tags=["Flujo Programado y Recordatorios HITL"],
+    dependencies=[Depends(require_operator)],
 )
 
 
@@ -40,7 +45,7 @@ class EjecutarFlujoRequest(BaseModel):
 class ConfirmarRecordatorioRequest(BaseModel):
     usuario_confirmador: str = Field(
         default="contador_autorizado",
-        description="Identificador del operador, contador o contribuyente que autoriza el despacho"
+        description="Campo legado ignorado: la identidad se obtiene de la autenticación del operador."
     )
 
 
@@ -56,8 +61,8 @@ def endpoint_ejecutar_tarea_diaria(payload: Optional[EjecutarFlujoRequest] = Non
         if payload and payload.fecha_simulada:
             f_ref = date.fromisoformat(payload.fecha_simulada)
         return ejecutar_tarea_diaria_recordatorios(fecha_referencia=f_ref)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en la ejecución de la tarea diaria: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="No se pudo ejecutar la tarea diaria.")
 
 
 @router.get("/recordatorios-pendientes", response_model=List[RecordatorioColaItem])
@@ -68,38 +73,50 @@ def endpoint_listar_recordatorios_pendientes():
     """
     try:
         return listar_recordatorios_pendientes()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="No se pudo consultar la cola de recordatorios.")
+
+
+@router.get("/recordatorios-en-revision", response_model=List[RecordatorioColaItem])
+def endpoint_listar_recordatorios_en_revision():
+    """Lista envíos inciertos para verificación manual, sin habilitar el reintento."""
+    return listar_recordatorios_en_revision()
 
 
 @router.post("/confirmar-recordatorio/{id_recordatorio}", response_model=EnviarRecordatorioOutput)
 def endpoint_confirmar_recordatorio(
     id_recordatorio: str,
-    payload: Optional[ConfirmarRecordatorioRequest] = None
+    payload: Optional[ConfirmarRecordatorioRequest] = None,
+    operator: str = Depends(require_operator),
 ):
     """
     Compuerta Humana (HITL): Aprueba y ejecuta el envío del recordatorio indicado.
     Genera un registro de auditoría y cambia el estado a ENVIADO.
     """
     try:
-        usuario = payload.usuario_confirmador if payload else "contador_autorizado"
         return confirmar_y_despachar_recordatorio(
             id_recordatorio=id_recordatorio,
-            usuario_confirmador=usuario
+            usuario_confirmador=operator
         )
-    except ValueError as ve:
-        raise HTTPException(status_code=404, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except EnvioInciertoError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ConsentimientoRequeridoError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="No se encontró el recordatorio solicitado.")
+    except Exception:
+        raise HTTPException(status_code=500, detail="No se pudo confirmar el recordatorio.")
 
 
 @router.post("/confirmar-todos", response_model=List[EnviarRecordatorioOutput])
-def endpoint_confirmar_todos(payload: Optional[ConfirmarRecordatorioRequest] = None):
+def endpoint_confirmar_todos(
+    payload: Optional[ConfirmarRecordatorioRequest] = None,
+    operator: str = Depends(require_operator),
+):
     """
     Compuerta Humana (HITL): Aprueba y despacha en lote todos los recordatorios pendientes.
     """
     try:
-        usuario = payload.usuario_confirmador if payload else "contador_autorizado"
-        return confirmar_todos_los_pendientes(usuario_confirmador=usuario)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return confirmar_todos_los_pendientes(usuario_confirmador=operator)
+    except Exception:
+        raise HTTPException(status_code=500, detail="No se pudo confirmar la cola de recordatorios.")

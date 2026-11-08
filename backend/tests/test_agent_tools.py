@@ -139,8 +139,21 @@ def test_tool_enviar_recordatorio_bloqueado_sin_confirmacion():
     assert "requiere confirmación explícita" in out.mensaje_accion
 
 
-def test_tool_enviar_recordatorio_exitoso_con_confirmacion():
+def test_tool_enviar_recordatorio_exitoso_con_confirmacion(monkeypatch):
     """Verifica que con confirmación humana se efectúe el envío y genere ID de auditoría."""
+    monkeypatch.setenv("SMTP_HOST", "smtp.test")
+    monkeypatch.setenv("SMTP_USER", "operador@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "clave-de-prueba")
+
+    class SMTPFake:
+        def __init__(self, *args, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def starttls(self): pass
+        def login(self, *args): pass
+        def sendmail(self, *args): return {}
+
+    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", SMTPFake)
     inp = EnviarRecordatorioInput(
         destinatario="contribuyente@empresa.ec",
         asunto="Recordatorio IVA SRI",

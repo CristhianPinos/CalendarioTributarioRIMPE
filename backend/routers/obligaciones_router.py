@@ -36,10 +36,10 @@ def explicar_obligacion(request: ExplicacionObligacionRequest) -> ExplicacionObl
     """Endpoint que genera la explicación con el modelo generativo."""
     try:
         return generar_explicacion_obligacion(request=request)
-    except Exception as exc:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error inesperado al procesar la explicación tributaria: {str(exc)}"
+            detail="No se pudo procesar la explicación tributaria."
         )
 
 
@@ -61,15 +61,15 @@ def calcular_simulacion_renta(request: SimulacionRentaRequest) -> SimulacionRent
             tipo_regimen=request.tipo_regimen.value
         )
         return SimulacionRentaResponse(**resultado)
-    except ValueError as val_err:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(val_err)
+            detail="Los datos de la simulación no son válidos para el régimen indicado."
         )
-    except Exception as exc:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al calcular la simulación de renta: {str(exc)}"
+            detail="No se pudo calcular la simulación de renta."
         )
 
 
