@@ -1,6 +1,6 @@
 # Registro de Decisiones Arquitectónicas (ADRs) - Calendario Tributario RIMPE
 
-Este documento recopila las Decisiones de Arquitectura de Software (**Architectural Decision Records - ADR**) adoptadas a lo largo de las Fases 1 y 2 del proyecto para garantizar la exactitud tributaria, la resiliencia técnica, el cumplimiento de la LOPDP y la cero alucinación de datos.
+Este documento recopila las Decisiones de Arquitectura de Software (**Architectural Decision Records - ADR**) adoptadas durante el desarrollo y el despliegue de demostración. Describe los controles implementados y sus límites observables; no constituye certificación legal ni garantía absoluta de disponibilidad.
 
 ---
 
@@ -13,6 +13,11 @@ Este documento recopila las Decisiones de Arquitectura de Software (**Architectu
 - [ADR-005: Anonimización y Auditoría Conforme a la LOPDP Ecuatoriana](#adr-005-anonimización-y-auditoría-conforme-a-la-lopdp-ecuatoriana)
 - [ADR-006: Desacoplamiento Total de Reglas Tributarias en Archivo Versionado](#adr-006-desacoplamiento-total-de-reglas-tributarias-en-archivo-versionado)
 - [ADR-007: Render Free como demostración sin persistencia](#adr-007-render-free-como-demostración-sin-persistencia)
+- [ADR-008: Minimización de datos y consentimiento para recordatorios](#adr-008-minimización-de-datos-y-consentimiento-para-recordatorios)
+- [ADR-009: Abstención ante consultas de evasión y falta de sustento](#adr-009-abstención-ante-consultas-de-evasión-y-falta-de-sustento)
+- [ADR-010: Envío puntual verificado sin operador ni perfil persistido](#adr-010-envío-puntual-verificado-sin-operador-ni-perfil-persistido)
+- [ADR-011: Transporte de correo por API HTTPS de Mailjet](#adr-011-transporte-de-correo-por-api-https-de-mailjet)
+- [ADR-012: Selección acotada de herramientas por Gemini](#adr-012-selección-acotada-de-herramientas-por-gemini)
 
 ---
 
@@ -42,7 +47,7 @@ Se seleccionó exclusivamente la familia **Google Gemini Flash** (`gemini-3-flas
 
 * **Fecha:** Octubre 2026 (Fase 2 - Semana 2)
 * **Estado:** Aceptado e Implementado
-* **Autores:** Desarrollador A & Cristhian Pinos (Desarrollador B)
+* **Autores:** Juan Lucumi (Desarrollador A) y Cristhian Pinos (Desarrollador B)
 
 ### Contexto
 Para evitar que el desarrollo del frontend (React SPA + FullCalendar) quedara bloqueado a la espera de que el backend estuviera completamente desplegado y probado, era imprescindible acordar un contrato de integración inmutable desde el primer día.
@@ -50,7 +55,7 @@ Para evitar que el desarrollo del frontend (React SPA + FullCalendar) quedara bl
 ### Decisión
 Se adoptó una arquitectura **Contract-First / API-First**:
 1. Se redactaron los esquemas de intercambio de datos en [`backend/schemas.py`](../backend/schemas.py) (`PerfilTributarioCreate`, `CalculoVencimientosRequest`, `CalendarioTributarioResponse`, `ExplicacionObligacionResponse`).
-2. Se estableció un cliente unificado en el frontend (`frontend/src/services/apiClient.js`) con una bandera `USE_MOCKS = true/false`, permitiendo al Desarrollador A renderizar el calendario y modales con datos sintéticos idénticos a los del backend real.
+2. Se estableció un cliente unificado en el frontend (`frontend/src/services/apiClient.js`) con una bandera `USE_MOCKS = true/false`, permitiendo a Juan Lucumi (Desarrollador A) renderizar el calendario y modales con datos sintéticos idénticos a los del backend real.
 3. Se asignaron ramas independientes en Git (`feature/frontend-spa` y `feature/backend-core-llm`).
 
 ### Consecuencias
@@ -74,7 +79,7 @@ Se implementó una política de resiliencia de dos niveles en [`backend/services
 2. **Nivel 2 - Fail-Safe / Fallback Determinista Oficial:** Si tras los 3 reintentos la API externa no responde o el entorno se encuentra completamente sin conexión a internet, el sistema activa automáticamente un catálogo de contingencia oficial preconstruido con base en las Resoluciones SRI NAC-24-0027, NAC-23-0034 y la LRTI, entregando la explicación pedagógica y cita legal con HTTP 200 y cero tiempo de inactividad.
 
 ### Consecuencias
-* **Positivas:** 100% de disponibilidad de servicio garantizada. Las pruebas automatizadas certifican la degradación elegante y recuperación ante fallas.
+* **Positivas:** El catálogo de contingencia permite responder a determinadas fallas del proveedor generativo; las pruebas automatizadas verifican ese flujo en los casos cubiertos. No demuestra disponibilidad continua del servicio completo.
 * **Negativas:** La respuesta de fallback, aunque normativamente precisa, es estática y no incluye respuestas personalizadas al campo `contexto_adicional` del usuario.
 
 ---
@@ -115,7 +120,7 @@ Se desarrolló el middleware asíncrono [`backend/middleware/logging_lopdp.py`](
 3. **Cero Fuga en Logs:** Ni el servidor uvicorn ni los archivos de auditoría almacenan identificadores en texto claro.
 
 ### Consecuencias
-* **Positivas:** Pleno cumplimiento legal ecuatoriano y auditoría transparente de rendimiento.
+* **Positivas:** Menor exposición de identificadores en logs y trazas cubiertos por las pruebas, con latencia de procesamiento observable. El control no equivale a una certificación de cumplimiento de la LOPDP.
 * **Negativas:** Requiere decodificación manual autorizada en caso de soporte técnico forense a contribuyentes individuales.
 
 ---
@@ -163,3 +168,74 @@ Para operar el flujo completo con datos personales y recordatorios persistentes 
 ### Decisiones éticas relacionadas
 
 La minimización de datos de la etapa 3 y la aprobación HITL de la etapa 1 se aplican a cualquier despliegue persistente. Las consultas de evasión se rechazan por la compuerta del RAG con cita del Código Tributario. Estas medidas son controles verificables del software; no sustituyen una revisión jurídica ni una auditoría independiente.
+
+---
+
+## ADR-008: Minimización de datos y consentimiento para recordatorios
+
+**Fecha:** Noviembre de 2026. **Estado:** Decisión histórica de la etapa 5; reemplazada para la aplicación pública por ADR-010.
+
+### Contexto
+
+El cálculo del calendario necesita un RUC y parámetros tributarios, pero no requiere guardar un perfil. En cambio, un recordatorio periódico necesita conservar el destinatario, el consentimiento y el estado de aprobación. Los logs y trazas pueden revelar identificadores si registran cuerpos, rutas dinámicas o excepciones.
+
+### Decisión
+
+- El calendario se puede calcular sin registrar el perfil. El alta persistente es una acción separada, autenticada y bloqueada por `RIMPE_DEMO_READONLY=true` en la demostración.
+- El consentimiento para notificaciones empieza desactivado, puede revocarse y se vuelve a comprobar antes del despacho. Las rutas de perfiles y cola requieren operador autenticado; el envío exige confirmación humana.
+- La auditoría registra método, plantilla de ruta, estado y latencia; no registra cuerpos de petición. Las trazas del agente reducen RUC, correo y contenido de mensajes. Los errores de validación no repiten valores recibidos.
+- La base SQLite y sus respaldos se tratan como datos privados. Solo un entorno con almacenamiento duradero y control de acceso puede activar el flujo persistente.
+
+### Consecuencias y evidencia
+
+La demostración permite consultas sin crear registros de perfiles. Esta decisión describe el flujo persistente histórico de la etapa 5, que quedó inactivo por ADR-010. El enmascaramiento de logs no cifra una base; si se reactiva la persistencia, deberá protegerse el volumen y los respaldos. Las pruebas actuales de almacenamiento, verificación de correo y privacidad están en [`backend/tests/test_storage.py`](../backend/tests/test_storage.py), [`backend/tests/test_correo_verificado.py`](../backend/tests/test_correo_verificado.py) y [`backend/tests/test_privacy_boundaries.py`](../backend/tests/test_privacy_boundaries.py).
+
+---
+
+## ADR-009: Abstención ante consultas de evasión y falta de sustento
+
+**Fecha:** Noviembre de 2026. **Estado:** Implementada y evaluada en el conjunto de referencia.
+
+### Contexto
+
+Una respuesta generativa sobre obligaciones fiscales puede resultar perjudicial si inventa una fecha, cita un artículo irrelevante o instruye al usuario para ocultar ingresos o facturas. La recuperación léxica también puede confundir preguntas fuera del alcance del corpus.
+
+### Decisión
+
+- [`backend/services/rag_service.py`](../backend/services/rag_service.py) aplica una compuerta previa a preguntas que solicitan evasión o fraude y devuelve abstención con la cita usada por el código, sin instrucciones para ejecutar la conducta.
+- Para preguntas sin sustento suficiente en los fragmentos vigentes, el RAG se abstiene y orienta al usuario hacia el SRI o un profesional. Las respuestas normativas admitidas incluyen citas estructuradas.
+- Los cálculos de fechas y montos permanecen en Python. Gemini se limita a explicaciones y recibe las fechas calculadas; el texto de una pregunta no autoriza modificar reglas ni despachar recordatorios.
+
+### Consecuencias y evidencia
+
+La [evaluación comparada](07-evaluacion.md#8-comparación-de-la-semana-4) obtuvo TP=4, TN=16, FP=0 y FN=0 sobre 20 preguntas. El [caso F4-15](08-pruebas.md#f4-15-consulta-orientada-a-omitir-facturas) verificó la abstención en la URL pública; [`backend/tests/test_rag_service.py`](../backend/tests/test_rag_service.py) cubre más ejemplos. El filtro por términos y el conjunto evaluado son limitados: deben ampliarse y revisarse al actualizar el corpus, sin presentar el resultado como inmunidad general frente a evasión o inyección.
+
+---
+
+## ADR-010: Envío puntual verificado sin operador ni perfil persistido
+
+**Fecha:** 11 de noviembre de 2026. **Estado:** Implementado localmente; no desplegado.
+
+El usuario pidió retirar cuentas de operador y perfiles guardados del flujo público. Mantener el despacho SMTP abierto a cualquier correo permitiría abuso de la cuenta de salida. Se sustituyó la autorización de operador por un código de seis dígitos enviado al mismo destinatario, válido diez minutos y consumido una sola vez. El usuario confirma expresamente el envío. Se limitan solicitudes por correo y globalmente; códigos y contadores se guardan solo en memoria, sin registrar perfiles tributarios ni códigos en logs.
+
+Las rutas públicas antiguas de perfiles y cola no se montan; las rutas directas del agente rechazan el despacho sin verificación. El código histórico de escaneo y almacenamiento queda inactivo para no publicar una cola sin control de acceso. Python sigue calculando las obligaciones y el agente prepara el recordatorio; SMTP informa aceptación, fallo o incertidumbre. La verificación de propiedad del correo requiere primero poder enviar el código, por lo que esta función no puede probarse en Render Free con SMTP por el puerto 587. Un reinicio invalida códigos pendientes y reinicia los contadores en memoria; antes de uso público sostenido se necesita un limitador compartido y un transporte de correo compatible.
+
+---
+
+## ADR-011: Transporte de correo por API HTTPS de Mailjet
+
+**Fecha:** 11 de noviembre de 2026. **Estado:** Implementado localmente; pendiente de prueba real y despliegue.
+
+Render Free bloquea los puertos SMTP habituales. El remitente institucional individual se validó en Mailjet sin administrar el DNS universitario; esta validación no garantiza aceptación por las políticas del dominio ni entrega en la bandeja. Para el flujo puntual de ADR-010 se sustituyó SMTP por la API HTTPS de Mailjet. `MAILJET_API_KEY`, `MAILJET_SECRET_KEY` y `MAILJET_FROM_EMAIL` se leen únicamente en el servidor. El código de verificación y el recordatorio usan el mismo transporte; se conserva la confirmación HITL y el cálculo en Python.
+
+`ENVIADO` significa que Mailjet devolvió un `MessageID` aceptado, no que el destinatario recibió o leyó el mensaje. Una respuesta HTTP rechazada queda `ERROR_ENVIO`; una pérdida de respuesta o una respuesta sin confirmación queda `ESTADO_INCIERTO`. El código temporal conserva su validez si la respuesta del proveedor es incierta. Las pruebas simulan aceptación, rechazo y timeout, sin enviar mensajes reales. La cuota gratuita, el estado de la cuenta Mailjet y las políticas del correo universitario deben comprobarse antes de habilitar envíos públicos. ADR-010 describe el diseño inicial con SMTP y queda actualizado por esta decisión.
+
+---
+
+## ADR-012: Selección acotada de herramientas por Gemini
+
+**Fecha:** Noviembre de 2026. **Estado:** Implementado y probado localmente con respuestas simuladas; pendiente de prueba en vivo y publicación.
+
+La revisión académica observó que el bucle del agente seguía un orden fijo decidido por `if/elif`, aunque la documentación lo llamaba selección dinámica. En la ruta `/api/agente/ejecutar`, Gemini puede proponer la siguiente herramienta entre las que Python habilita según las dependencias del estado. Python verifica que la propuesta pertenezca a esa lista, construye los parámetros y ejecuta las herramientas. No se envían al selector la instrucción libre ni RUC, nombre, correo o importes. Ante una respuesta inválida, falta de clave o error del proveedor, se usa el orden seguro comprobado. Las trazas registran herramienta, candidatas y origen de la selección; no el razonamiento libre del modelo.
+
+El agente tiene máximo de iteraciones y la ruta comparte la cuota generativa, reservando cuatro llamadas posibles por ejecución. La ruta del agente rechaza envíos; el envío real conserva el código de un solo uso y la confirmación en `/api/correo`. Ese flujo usa el orden determinista para que una caída de Gemini no desperdicie un código ya consumido. La selección del modelo no calcula fechas ni montos y no puede autorizar un destinatario. Las pruebas cubren elección válida, elección prohibida, fallo de Gemini, orden alternativo, cuota y compuerta HITL; no constituyen una prueba de selección en vivo.

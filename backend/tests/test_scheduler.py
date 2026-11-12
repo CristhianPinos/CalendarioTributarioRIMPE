@@ -37,19 +37,8 @@ TEST_DB_PATH = Path("data/processed/test_recordatorios_temp.json")
 @pytest.fixture(autouse=True)
 def clean_test_store(monkeypatch):
     """Limpia la base de datos temporal antes y después de cada prueba."""
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("SMTP_USER", "operador@example.com")
-    monkeypatch.setenv("SMTP_PASSWORD", "clave-de-prueba")
-
-    class SMTPFake:
-        def __init__(self, *args, **kwargs): pass
-        def __enter__(self): return self
-        def __exit__(self, *args): pass
-        def starttls(self): pass
-        def login(self, *args): pass
-        def sendmail(self, *args): return {}
-
-    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", SMTPFake)
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.configurado", lambda: True)
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.enviar_correo", lambda *args: "12345")
     store = ColaRecordatoriosStore(TEST_DB_PATH)
     store.limpiar_cola()
     yield store

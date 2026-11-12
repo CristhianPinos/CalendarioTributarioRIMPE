@@ -260,7 +260,7 @@ def ejecutar_tarea_diaria_recordatorios(
     1. Escanea todos los contribuyentes registrados.
     2. Calcula sus obligaciones mediante el motor determinista.
     3. Detecta aquellas que vencen dentro de la ventana de anticipación (5 días hábiles).
-    4. Redacta el recordatorio formal fundamentado con citas del motor RAG.
+    4. Redacta el recordatorio con referencias normativas verificadas.
     5. Guarda el recordatorio con estado 'PENDIENTE_CONFIRMACION' (Compuerta HITL).
     """
     db = store or _STORE_GLOBAL
@@ -310,13 +310,15 @@ def ejecutar_tarea_diaria_recordatorios(
                             omitidos_por_idempotencia += 1
                             continue
 
-                        # Redactar recordatorio con citas RAG
+                        # Redactar recordatorio con el evento y año calculados
                         inp_red = RedactarRecordatorioInput(
                             codigo_obligacion=codigo_ob,
                             ruc=c["ruc"],
                             razon_social=c.get("razon_social", "Contribuyente"),
                             tipo_regimen=c["tipo_regimen"],
-                            fecha_vencimiento=evento["fecha_vencimiento"]
+                            fecha_vencimiento=evento["fecha_vencimiento"],
+                            titulo_obligacion=evento["titulo"],
+                            anio_fiscal=res_venc.anio_fiscal,
                         )
                         out_red = tool_redactar_recordatorio(inp_red)
 

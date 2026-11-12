@@ -116,6 +116,14 @@ class TestObligacionesRouter:
         # Pydantic v2 ge=0.0 valida antes y retorna HTTP 422
         assert response.status_code == 422
 
+    def test_simulador_renta_fuera_de_rimpe_explica_motivo(self):
+        response = client.post("/api/simulador/renta", json={
+            "ingresos_brutos": 300000.01,
+            "tipo_regimen": "RIMPE_NEGOCIO_POPULAR",
+        })
+        assert response.status_code == 422
+        assert "Régimen General" in response.json()["detail"]
+
     def test_endpoint_simulacion_error_429(self):
         response = client.post("/api/test/simular-error-429")
         assert response.status_code == 429

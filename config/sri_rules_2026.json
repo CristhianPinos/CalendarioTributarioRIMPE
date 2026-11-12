@@ -42,7 +42,7 @@
     "iva_semestre_1": 7,
     "iva_semestre_2": 1,
     "renta_rimpe_negocio_popular": 5,
-    "renta_rimpe_emprendedor_natural": 3,
+    "renta_rimpe_emprendedor_natural": 5,
     "renta_rimpe_emprendedor_sociedad": 4
   },
   "tabla_negocio_popular_renta": [
@@ -57,7 +57,7 @@
     { "limite_inferior": 50000.01, "limite_superior": 75000.00, "impuesto_fraccion_basica": 360.00, "tipo_marginal_porcentaje": 1.25 },
     { "limite_inferior": 75000.01, "limite_superior": 100000.00, "impuesto_fraccion_basica": 672.50, "tipo_marginal_porcentaje": 1.50 },
     { "limite_inferior": 100000.01, "limite_superior": 200000.00, "impuesto_fraccion_basica": 1047.50, "tipo_marginal_porcentaje": 1.75 },
-    { "limite_inferior": 200000.01, "limite_superior": 300000.00, "impuesto_fraccion_basica": 2797.50, "tipo_marginal_porcentaje": 2.00 }
+    { "limite_inferior": 200000.01, "limite_superior": 300000.00, "impuesto_fraccion_basica": 2797.52, "tipo_marginal_porcentaje": 2.00 }
   ],
   "feriados_nacionales_ecuador_fijos": [
     { "mes": 1, "dia": 1, "nombre": "Año Nuevo" },

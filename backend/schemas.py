@@ -210,6 +210,10 @@ class RecordatorioEstructurado(BaseModel):
         ...,
         description="Explicación clara en 2 o 3 párrafos cortos sin tecnicismos innecesarios."
     )
+    comprobantes_validos: str = Field(
+        default="",
+        description="Documentos que sustentan la declaración, según la obligación y el régimen."
+    )
     consecuencia_incumplimiento: str = Field(
         ...,
         description="Multas, intereses y recargos aplicables según el Código Tributario y el Art. 100 de la LRTI."
@@ -231,6 +235,7 @@ class ExplicacionObligacionRequest(BaseModel):
     codigo_obligacion: str = Field(
         ...,
         min_length=3,
+        max_length=64,
         description="Código de la obligación (e.g. IVA_SEMESTRAL_1, RENTA_ANUAL_EMPRENDEDOR)."
     )
     tipo_regimen: TipoRegimen = Field(

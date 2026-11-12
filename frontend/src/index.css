@@ -113,6 +113,21 @@
 }
 
 /* Estilo de los eventos */
+.calendar-container {
+  overflow-x: auto;
+}
+
+.calendar-container .fc {
+  min-width: 700px;
+}
+
+.calendar-container .fc-daygrid-event,
+.calendar-container .fc-event-main,
+.calendar-container .fc-event-main-frame {
+  white-space: normal;
+  overflow: visible;
+}
+
 .fc-event {
   cursor: pointer;
   border: none !important;

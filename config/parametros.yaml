@@ -72,7 +72,7 @@ meses_declaracion:
   iva_semestre_1: 7                       # Julio (Período Enero - Junio)
   iva_semestre_2: 1                       # Enero del año siguiente (Período Julio - Diciembre)
   renta_rimpe_negocio_popular: 5          # Mayo del año siguiente
-  renta_rimpe_emprendedor_natural: 3      # Marzo del año siguiente
+  renta_rimpe_emprendedor_natural: 5      # Mayo del año siguiente (Res. NAC-DGERCGC24-00000027, art. 8)
   renta_rimpe_emprendedor_sociedad: 4     # Abril del año siguiente
 
 # ------------------------------------------------------------------------------
@@ -114,7 +114,7 @@ tabla_emprendedor_renta:
     tipo_marginal_porcentaje: 1.75
   - limite_inferior: 200000.01
     limite_superior: 300000.00
-    impuesto_fraccion_basica: 2797.50
+    impuesto_fraccion_basica: 2797.52
     tipo_marginal_porcentaje: 2.00
 
 # ------------------------------------------------------------------------------

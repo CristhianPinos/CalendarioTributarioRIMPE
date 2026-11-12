@@ -4,7 +4,7 @@
  * Caso N.º 11 – Grupo 11
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Navbar from "./components/Navbar";
 import ProfileForm from "./components/ProfileForm";
 import CalendarView from "./components/CalendarView";
@@ -12,7 +12,7 @@ import ExplanationModal from "./components/ExplanationModal";
 import TaxSimulatorModal from "./components/TaxSimulatorModal";
 import Footer from "./components/Footer";
 import { calcularCalendario } from "./services/apiClient";
-import { Sparkles, Shield, AlertCircle, Info } from "lucide-react";
+import { CheckCircle2, Sparkles, Shield } from "lucide-react";
 
 export default function App() {
   const [calendario, setCalendario] = useState(null);
@@ -25,22 +25,13 @@ export default function App() {
   const [modalExplicacionAbierto, setModalExplicacionAbierto] = useState(false);
   const [modalSimuladorAbierto, setModalSimuladorAbierto] = useState(false);
 
-  // Cargar calendario inicial de demostración al iniciar para que la interfaz sea inmediatamente visible
-  useEffect(() => {
-    const perfilInicial = {
-      ruc: "0923456784001",
-      razon_social: "Comercial Pinos & Asociados",
-      tipo_regimen: "RIMPE_EMPRENDEDOR",
-      tiene_actividades_excluidas: false,
-      anio: 2026,
-      email: "cristhian.pinos@empresa.ec",
-    };
-    handleGenerarCalendario(perfilInicial);
-  }, []);
-
   const handleGenerarCalendario = async (perfilData) => {
     setCargando(true);
     setErrorBackend(null);
+    setCalendario(null);
+    setPerfilActivo(null);
+    setObligacionSeleccionada(null);
+    setModalExplicacionAbierto(false);
 
     try {
       const res = await calcularCalendario(perfilData);
@@ -75,12 +66,12 @@ export default function App() {
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               </span>
               <span className="text-slate-200">
-                <strong>Arquitectura Híbrida:</strong> Fechas calculadas de forma matemática por Python (Zero Hallucination). Explicaciones generadas con Google Gemini Flash fundamentadas en los 7 PDFs oficiales del SRI.
+                <strong>Arquitectura Híbrida:</strong> Fechas calculadas por Python. Explicaciones generadas con Gemini cuando está disponible; en caso contrario, se muestra el catálogo de contingencia.
               </span>
             </div>
             <div className="flex items-center space-x-2 flex-shrink-0 text-slate-400">
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Resoluciones SRI NAC-24-0027 y NAC-23-0034</span>
+              <span>Fuentes: LRTI, Reglamento y normativa RIMPE publicada por el SRI</span>
             </div>
           </div>
         </div>
@@ -96,6 +87,47 @@ export default function App() {
               cargando={cargando}
               errorBackend={errorBackend}
             />
+            {perfilActivo && calendario && (
+              <section aria-label="Resumen del perfil del calendario generado" className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <div className="flex items-center gap-2 text-emerald-700 mb-4">
+                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                  <h3 className="font-bold text-sm">Perfil del calendario generado</h3>
+                </div>
+                <dl className="text-xs divide-y divide-slate-100">
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-slate-500">Contribuyente</dt>
+                    <dd className="font-semibold text-slate-800 text-right break-words min-w-0">{perfilActivo.razon_social}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-slate-500">RUC</dt>
+                    <dd className="font-mono font-semibold text-slate-800">{perfilActivo.ruc}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-slate-500">Noveno dígito</dt>
+                    <dd className="font-semibold text-slate-800">{calendario.noveno_digito}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-slate-500">Régimen</dt>
+                    <dd className="font-semibold text-slate-800 text-right">
+                      {perfilActivo.tipo_regimen === "RIMPE_EMPRENDEDOR" ? "RIMPE Emprendedor" : "RIMPE Negocio Popular"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-slate-500">Año fiscal</dt>
+                    <dd className="font-semibold text-slate-800">{calendario.anio_fiscal}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-slate-500">Actividades excluidas</dt>
+                    <dd className="font-semibold text-slate-800">{perfilActivo.tiene_actividades_excluidas ? "Sí" : "No"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-slate-500">Obligaciones</dt>
+                    <dd className="font-semibold text-slate-800">{calendario.total_obligaciones}</dd>
+                  </div>
+                </dl>
+                <p className="text-[11px] text-slate-500 mt-3">Este perfil solo se usa durante la sesión. El correo se solicita al abrir un vencimiento.</p>
+              </section>
+            )}
           </div>
 
           {/* Panel Derecho: Vista del Calendario Interactivo FullCalendar (8 de 12 col) */}
@@ -110,19 +142,21 @@ export default function App() {
       </main>
 
       {/* Modal Didáctico de Explicación con IA y Compuerta HITL */}
-      <ExplanationModal
+      {modalExplicacionAbierto && <ExplanationModal
         isOpen={modalExplicacionAbierto}
         onClose={() => setModalExplicacionAbierto(false)}
         obligacion={obligacionSeleccionada}
         perfil={perfilActivo || calendario}
-      />
+      />}
 
       {/* Modal Simulador de Impuesto a la Renta */}
-      <TaxSimulatorModal
-        isOpen={modalSimuladorAbierto}
-        onClose={() => setModalSimuladorAbierto(false)}
-        regimenInicial={calendario?.tipo_regimen || "RIMPE_EMPRENDEDOR"}
-      />
+      {modalSimuladorAbierto && (
+        <TaxSimulatorModal
+          isOpen
+          onClose={() => setModalSimuladorAbierto(false)}
+          regimenInicial={calendario?.tipo_regimen || "RIMPE_EMPRENDEDOR"}
+        />
+      )}
 
       {/* Pie de Página */}
       <Footer />

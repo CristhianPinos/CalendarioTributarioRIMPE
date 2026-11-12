@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { ShieldCheck, BookOpen, ExternalLink, Scale } from "lucide-react";
+import { ShieldCheck, BookOpen, Scale } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -19,7 +19,10 @@ export default function Footer() {
               Caso N.º 11 – Grupo 11
             </h4>
             <p className="text-[11px] leading-relaxed text-slate-400">
-              Ingeniería de Software con IA Generativa. Calendario tributario personalizado con explicaciones asistidas por Google Gemini Flash y motor determinista de fechas.
+              Ingeniería de Software con IA Generativa. Calendario tributario personalizado con explicaciones asistidas por IA cuando está disponible y motor determinista de fechas.
+            </p>
+            <p className="text-[11px] leading-relaxed text-slate-300 mt-2">
+              Esta aplicación fue desarrollada con el apoyo de herramientas de inteligencia artificial. Sus resultados deben verificarse con las fuentes oficiales.
             </p>
           </div>
 
@@ -30,10 +33,10 @@ export default function Footer() {
               Cuerpos Normativos Oficiales
             </h4>
             <ul className="space-y-1 text-[11px] text-slate-400">
-              <li>• Ley de Régimen Tributario Interno (LRTI codificada)</li>
-              <li>• Ley de Eficiencia Económica (R.O. Suplemento 461)</li>
-              <li>• Resolución SRI NAC-DGERCGC23-00000034 (Calendario)</li>
-              <li>• Resolución SRI NAC-DGERCGC24-00000027 (Retenciones)</li>
+              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/normativa-tributaria-legislacion-nacional" target="_blank" rel="noreferrer">Ley de Régimen Tributario Interno (LRTI)</a></li>
+              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/normativa-tributaria-legislacion-nacional" target="_blank" rel="noreferrer">Reglamento para la aplicación de la LRTI</a></li>
+              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.registroficial.gob.ec/suplemento-al-registro-oficial-no-461/" target="_blank" rel="noreferrer">Ley Orgánica de Eficiencia Económica y Generación de Empleo (R.O. 461)</a></li>
+              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar?id=7c3fb8dc-31a6-4fe3-a6c0-abe1def2c78a&amp;nombre=NAC-DGERCGC24-00000027.pdf" target="_blank" rel="noreferrer">Resolución NAC-DGERCGC24-00000027 (normas de aplicación del RIMPE)</a></li>
             </ul>
           </div>
 
@@ -51,10 +54,10 @@ export default function Footer() {
 
         <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
           <span>
-            © {new Date().getFullYear()} Calendario Tributario RIMPE • Servicio de Rentas Internas (SRI Ecuador).
+            Calendario Tributario RIMPE • Proyecto académico independiente; no afiliado al SRI.
           </span>
           <span className="font-mono text-slate-500">
-            Algoritmo Módulo 10 • Zero Date Hallucination • Gemini Flash 3.8
+            Fechas calculadas por Python • Explicaciones asistidas por IA cuando está disponible
           </span>
         </div>
       </div>

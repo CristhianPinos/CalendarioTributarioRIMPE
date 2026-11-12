@@ -122,15 +122,13 @@ def test_profile_registration_defaults_to_no_mail_consent(tmp_path, monkeypatch)
     assert store.listar_perfiles_consentidos() == []
 
 
-def test_direct_dispatch_requires_current_consent(tmp_path, monkeypatch):
-    store = SQLiteStore(tmp_path / "rimpe.sqlite3", None)
-    monkeypatch.setattr("backend.routers.agente_router._STORE_GLOBAL", store)
+def test_direct_dispatch_requires_verified_email():
     params = EnviarRecordatorioInput(
         destinatario="contacto@example.com", asunto="Aviso tributario",
         texto="Recordatorio de prueba con cita normativa.", confirmacion_usuario=True,
     )
     with pytest.raises(HTTPException) as denied:
-        endpoint_tool_enviar_recordatorio(params, operator="operador")
+        endpoint_tool_enviar_recordatorio(params)
     assert denied.value.status_code == 403
 
 

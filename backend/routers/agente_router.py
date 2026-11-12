@@ -10,8 +10,7 @@ a sus 4 herramientas formales y compuerta de confirmación humana (HITL).
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
-from backend.operator_auth import optional_operator, require_dispatch_operator
-from backend.services.scheduler import _STORE_GLOBAL
+from backend.services.rate_limit import limit_agent_requests
 
 from backend.services.agent_service import (
     AgenteTributarioRIMPE,
@@ -43,26 +42,21 @@ class InvocacionAgenteRequest(BaseModel):
     confirmacion_envio: bool = Field(default=False, description="True si el usuario autoriza explícitamente el envío")
 
 
-@router.post("/ejecutar", response_model=ResultadoAgente)
-def ejecutar_agente(payload: InvocacionAgenteRequest, operator: Optional[str] = Depends(optional_operator)):
+@router.post("/ejecutar", response_model=ResultadoAgente, dependencies=[Depends(limit_agent_requests)])
+def ejecutar_agente(payload: InvocacionAgenteRequest):
     """
     Ejecuta el ciclo de razonamiento y herramientas del Agente Tributario
     respetando el límite de 5 iteraciones y la compuerta de confirmación humana.
     """
     if payload.confirmacion_envio:
-        require_dispatch_operator(operator)
-        perfil = payload.perfil
-        if not _STORE_GLOBAL.has_consent(str(perfil.get("ruc", "")), str(perfil.get("email", ""))):
-            raise HTTPException(status_code=403, detail="El perfil no autoriza recordatorios para el destinatario actual.")
-    agente = AgenteTributarioRIMPE()
+        raise HTTPException(status_code=403, detail="El envío requiere verificar el correo mediante /api/correo.")
+    agente = AgenteTributarioRIMPE(usar_seleccion_gemini=True)
     resultado = agente.ejecutar(
         instruccion=payload.instruccion,
         perfil=payload.perfil,
         base_imponible_iva=payload.base_imponible_iva,
         confirmacion_envio=payload.confirmacion_envio
     )
-    if payload.confirmacion_envio:
-        resultado = resultado.model_copy(update={"usuario_confirmador": operator})
     return resultado
 
 
@@ -94,18 +88,14 @@ def endpoint_tool_redactar_recordatorio(params: RedactarRecordatorioInput):
 
 
 @router.post("/herramientas/enviar-recordatorio", response_model=EnviarRecordatorioOutput)
-def endpoint_tool_enviar_recordatorio(params: EnviarRecordatorioInput, operator: Optional[str] = Depends(optional_operator)):
+def endpoint_tool_enviar_recordatorio(params: EnviarRecordatorioInput):
     """
     Herramienta 4: Despacho de recordatorio con compuerta estricta de confirmación humana (HITL).
     """
     if params.confirmacion_usuario:
-        require_dispatch_operator(operator)
-        if not _STORE_GLOBAL.has_consent_email(str(params.destinatario)):
-            raise HTTPException(status_code=403, detail="El perfil no autoriza recordatorios para el destinatario actual.")
+        raise HTTPException(status_code=403, detail="El envío requiere verificar el correo mediante /api/correo.")
     try:
         result = tool_enviar_recordatorio(params)
-        if params.confirmacion_usuario:
-            result = result.model_copy(update={"usuario_confirmador": operator})
         return result
     except Exception:
         raise HTTPException(status_code=400, detail="No se pudo procesar el despacho del recordatorio.")

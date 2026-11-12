@@ -3,7 +3,7 @@
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE  
 **Fase:** Fase 3 – Conocimiento especializado: RAG, agente y calidad (Semana 3)  
 **Integrantes:**
-- Desarrollador A: Líder de Frontend e Integración Web
+- Juan Lucumi (Desarrollador A): Líder de Frontend e Integración Web
 - Cristhian Pinos (Desarrollador B): Líder de Backend Core, Arquitectura de IA & QA Lead  
 **Rama de Trabajo:** `main` (Full-Stack Integrado con RAG y Agente)  
 **Periodo:** Octubre 2026 / Fase 3 – Semana 3  

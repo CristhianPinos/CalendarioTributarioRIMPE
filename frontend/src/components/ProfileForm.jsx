@@ -4,23 +4,20 @@
  * Caso N.º 11 – Grupo 11
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   CheckCircle2,
   AlertCircle,
   Building2,
   Calendar,
-  Mail,
   Sparkles,
   ShieldCheck,
-  Zap,
   ArrowRight,
   ArrowLeft,
   Check,
   User,
 } from "lucide-react";
 import { validarRucPersonaNatural } from "../utils/rucValidator";
-import { guardarPerfilRegistrado, verificarSaludBackend } from "../services/apiClient";
 
 // Mapeo oficial del SRI de noveno dígito a día de vencimiento nominal
 const DIAS_POR_NOVENO_DIGITO = {
@@ -36,100 +33,30 @@ const DIAS_POR_NOVENO_DIGITO = {
   0: 28,
 };
 
-// Contribuyentes reales de prueba para testing inmediato (Guayas, Pichincha, Azuay)
-const PRESETS_PRUEBA = [
-  {
-    etiqueta: "Emprendedor (Guayas - Dígito 8)",
-    ruc: "0923456784001",
-    razonSocial: "Comercial Pinos & Asociados",
-    regimen: "RIMPE_EMPRENDEDOR",
-    excluidas: false,
-    email: "cristhian.pinos@empresa.ec",
-  },
-  {
-    etiqueta: "Negocio Popular (Pichincha - Dígito 6)",
-    ruc: "1710034065001",
-    razonSocial: "Bazar y Papelería San Francisco",
-    regimen: "RIMPE_NEGOCIO_POPULAR",
-    excluidas: false,
-    email: "bazar.sf@negocio.ec",
-  },
-  {
-    etiqueta: "Mixto con Act. Excluida (Dígito 0)",
-    ruc: "0910000009001",
-    razonSocial: "Servicios Contables y Tienda",
-    regimen: "RIMPE_EMPRENDEDOR",
-    excluidas: true,
-    email: "contacto@mixto.ec",
-  },
-];
-
 const PASOS = [
   { id: 1, titulo: "RUC", subtitulo: "Módulo 10" },
   { id: 2, titulo: "Régimen", subtitulo: "Tipo RIMPE" },
-  { id: 3, titulo: "Contacto", subtitulo: "Correo y Año" },
-  { id: 4, titulo: "Resumen", subtitulo: "Generar" },
+  { id: 3, titulo: "Datos", subtitulo: "Nombre y Año" },
 ];
 
 export default function ProfileForm({ onGenerarCalendario, cargando, errorBackend }) {
   const [pasoActual, setPasoActual] = useState(1);
-  const [ruc, setRuc] = useState("0923456784001");
-  const [razonSocial, setRazonSocial] = useState("Comercial Pinos & Asociados");
-  const [tipoRegimen, setTipoRegimen] = useState("RIMPE_EMPRENDEDOR");
+  const [ruc, setRuc] = useState("");
+  const [razonSocial, setRazonSocial] = useState("");
+  const [tipoRegimen, setTipoRegimen] = useState("");
   const [tieneActividadesExcluidas, setTieneActividadesExcluidas] = useState(false);
-  const [anio, setAnio] = useState(2026);
-  const [email, setEmail] = useState("contacto@empresa.ec");
-  const [correoNotificaciones, setCorreoNotificaciones] = useState(false);
-  const [operador, setOperador] = useState("");
-  const [claveOperador, setClaveOperador] = useState("");
-  const [guardandoPerfil, setGuardandoPerfil] = useState(false);
-  const [estadoGuardado, setEstadoGuardado] = useState("");
-  const [demoReadOnly, setDemoReadOnly] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    verificarSaludBackend().then((result) => {
-      if (active && result.online) setDemoReadOnly(Boolean(result.data?.demo_readonly));
-    });
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => { setEstadoGuardado(""); }, [ruc, razonSocial, tipoRegimen, tieneActividadesExcluidas, anio, email, correoNotificaciones]);
-
-  const [estadoRuc, setEstadoRuc] = useState({
-    valido: true,
-    novenoDigito: 8,
-    provincia: "09",
-    error: null,
-  });
-
-  // Validar RUC en tiempo real mientras el usuario escribe
-  useEffect(() => {
-    if (!ruc) {
-      setEstadoRuc({ valido: false, novenoDigito: null, provincia: null, error: null });
-      return;
-    }
-    const resultado = validarRucPersonaNatural(ruc);
-    setEstadoRuc(resultado);
-  }, [ruc]);
-
-  const aplicarPreset = (preset) => {
-    setRuc(preset.ruc);
-    setRazonSocial(preset.razonSocial);
-    setTipoRegimen(preset.regimen);
-    setTieneActividadesExcluidas(preset.excluidas);
-    setEmail(preset.email);
-  };
+  const [anio, setAnio] = useState("");
+  const estadoRuc = validarRucPersonaNatural(ruc);
 
   const puedeAvanzarPaso1 = estadoRuc.valido;
   const puedeAvanzarPaso2 = Boolean(tipoRegimen);
-  const puedeAvanzarPaso3 = email.trim().length > 3 && razonSocial.trim().length > 0;
+  const nombreValido = razonSocial.trim().length >= 3 && razonSocial.trim().length <= 150;
+  const puedeAvanzarPaso3 = nombreValido && Boolean(anio);
 
   const handleSiguiente = () => {
     if (pasoActual === 1 && !puedeAvanzarPaso1) return;
     if (pasoActual === 2 && !puedeAvanzarPaso2) return;
-    if (pasoActual === 3 && !puedeAvanzarPaso3) return;
-    setPasoActual((prev) => Math.min(prev + 1, 4));
+    setPasoActual((prev) => Math.min(prev + 1, 3));
   };
 
   const handleAnterior = () => {
@@ -138,42 +65,16 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!estadoRuc.valido) return;
+    if (pasoActual !== 3 || cargando || !estadoRuc.valido || !tipoRegimen || !puedeAvanzarPaso3) return;
 
-    // Se despacha el perfil íntegro a App.jsx para coordinar calendario y notificaciones del agente
+    // El perfil permanece en la sesión para calcular el calendario y explicar sus vencimientos.
     onGenerarCalendario({
       ruc,
       razon_social: razonSocial,
       tipo_regimen: tipoRegimen,
       tiene_actividades_excluidas: tieneActividadesExcluidas,
       anio: parseInt(anio, 10),
-      email,
     });
-  };
-
-  const handleGuardarPerfil = async () => {
-    if (!estadoRuc.valido || !puedeAvanzarPaso3 || !operador || !claveOperador) return;
-    setGuardandoPerfil(true);
-    setEstadoGuardado("");
-    try {
-      await guardarPerfilRegistrado({
-        ruc,
-        razon_social: razonSocial,
-        tipo_regimen: tipoRegimen,
-        tiene_actividades_excluidas: tieneActividadesExcluidas,
-        anio,
-        email,
-        correo_notificaciones: correoNotificaciones,
-      }, { username: operador, password: claveOperador });
-      setEstadoGuardado(correoNotificaciones
-        ? "Perfil guardado con autorización para recordatorios."
-        : "Perfil guardado sin autorización para recordatorios.");
-    } catch (error) {
-      setEstadoGuardado(error.message || "No se pudo guardar el perfil.");
-    } finally {
-      setClaveOperador("");
-      setGuardandoPerfil(false);
-    }
   };
 
   return (
@@ -197,7 +98,7 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
         </div>
 
         {/* Stepper Superior Integrado */}
-        <div className="mt-4 pt-3 border-t border-blue-700/40 grid grid-cols-4 gap-1 sm:gap-2">
+        <div className="mt-4 pt-3 border-t border-blue-700/40 grid grid-cols-3 gap-1 sm:gap-2">
           {PASOS.map((paso) => {
             const completado = pasoActual > paso.id;
             const activo = pasoActual === paso.id;
@@ -241,29 +142,6 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 space-y-5">
-        {/* Presets Rápidos de Demostración (diseño idéntico original) */}
-        <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center">
-              <Zap className="w-3.5 h-3.5 mr-1 text-amber-500" />
-              Cargar Perfil de Prueba Rápido
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {PRESETS_PRUEBA.map((preset, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => aplicarPreset(preset)}
-                className="text-left p-2 rounded-lg border border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/50 transition-all text-xs"
-              >
-                <p className="font-semibold text-slate-800 truncate">{preset.etiqueta}</p>
-                <p className="text-[11px] text-slate-500 font-mono mt-0.5">{preset.ruc}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* ============================================================ */}
         {/* PASO 1: RUC Y VALIDACIÓN MÓDULO 10                          */}
         {/* ============================================================ */}
@@ -277,9 +155,10 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
                 <input
                   id="ruc-input-field"
                   type="text"
+                  inputMode="numeric"
                   maxLength={13}
                   value={ruc}
-                  onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => setRuc(e.target.value.replace(/\D/g, "").slice(0, 13))}
                   placeholder="Ej: 0923456784001"
                   className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border transition-all outline-none ${
                     estadoRuc.valido
@@ -386,43 +265,27 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
         )}
 
         {/* ============================================================ */}
-        {/* PASO 3: CONTACTO (CORREO, RAZÓN SOCIAL Y AÑO)                */}
+        {/* PASO 3: NOMBRE Y AÑO FISCAL                                  */}
         {/* ============================================================ */}
         {pasoActual === 3 && (
           <div className="space-y-4 animate-in fade-in duration-150">
             <div>
               <label htmlFor="razon-social-field" className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Razón Social / Nombre Comercial
+                Nombre o Razón Social
               </label>
               <div className="relative">
                 <input
                   id="razon-social-field"
                   type="text"
                   required
+                  minLength={3}
+                  maxLength={150}
                   value={razonSocial}
                   onChange={(e) => setRazonSocial(e.target.value)}
-                  placeholder="Ej: Comercial Andina S.A."
+                  placeholder="Ej: Comercial Andina"
                   className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
                 />
                 <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="email-notificacion-field" className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Correo Electrónico de Notificación (HITL)
-              </label>
-              <div className="relative">
-                <input
-                  id="email-notificacion-field"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="contribuyente@empresa.ec"
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                />
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               </div>
             </div>
 
@@ -433,10 +296,12 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
               <div className="relative">
                 <select
                   id="select-anio-fiscal"
+                  required
                   value={anio}
-                  onChange={(e) => setAnio(parseInt(e.target.value, 10))}
+                  onChange={(e) => setAnio(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
                 >
+                  <option value="" disabled>Selecciona el año fiscal</option>
                   <option value={2026}>2026 (Ejercicio Fiscal Vigente)</option>
                   <option value={2025}>2025</option>
                   <option value={2024}>2024</option>
@@ -444,66 +309,6 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
                 <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               </div>
             </div>
-          </div>
-        )}
-
-        {/* ============================================================ */}
-        {/* PASO 4: RESUMEN ANTES DE GENERAR EL CALENDARIO               */}
-        {/* ============================================================ */}
-        {pasoActual === 4 && (
-          <div className="space-y-4 animate-in fade-in duration-150">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2">
-              <div className="flex justify-between py-1 border-b border-slate-200/70">
-                <span className="text-slate-500">RUC Persona Natural:</span>
-                <span className="font-mono font-bold text-slate-800">{ruc}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-200/70">
-                <span className="text-slate-500">Contribuyente:</span>
-                <span className="font-bold text-slate-800">{razonSocial}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-200/70">
-                <span className="text-slate-500">Noveno Dígito / Día:</span>
-                <span className="font-bold text-blue-700">
-                  Dígito {estadoRuc.novenoDigito} (Día {DIAS_POR_NOVENO_DIGITO[estadoRuc.novenoDigito]})
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-200/70">
-                <span className="text-slate-500">Régimen:</span>
-                <span className="font-bold text-slate-800">
-                  {tipoRegimen === "RIMPE_EMPRENDEDOR" ? "RIMPE Emprendedor" : "RIMPE Negocio Popular"}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-200/70">
-                <span className="text-slate-500">Actividades Excluidas:</span>
-                <span className="font-bold text-slate-800">
-                  {tieneActividadesExcluidas ? "Sí (Incluye IVA General)" : "No"}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Correo para HITL:</span>
-                <span className="font-bold text-slate-800">{email}</span>
-              </div>
-            </div>
-            {demoReadOnly ? (
-              <p className="border border-amber-200 bg-amber-50 rounded-xl p-4 text-xs text-amber-900">
-                Demostración pública: genera el calendario sin registrar datos personales. Los recordatorios persistentes están desactivados.
-              </p>
-            ) : <div className="border border-slate-200 rounded-xl p-4 space-y-3 text-xs">
-              <h3 className="font-bold text-slate-800">Registro opcional para el escaneo diario</h3>
-              <p className="text-slate-600">El calendario se puede generar sin guardar el perfil. Solo un operador autorizado puede registrar el perfil.</p>
-              <label className="flex items-start gap-2 text-slate-700">
-                <input type="checkbox" checked={correoNotificaciones} onChange={(e) => setCorreoNotificaciones(e.target.checked)} className="mt-0.5" />
-                <span>Confirmo que el contribuyente autorizó recibir recordatorios por correo. Puedo desactivar esta autorización y volver a guardar el perfil.</span>
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input aria-label="Usuario del operador" autoComplete="username" value={operador} onChange={(e) => setOperador(e.target.value)} placeholder="Usuario del operador" className="border border-slate-300 rounded-lg p-2" />
-                <input aria-label="Clave del operador" type="password" autoComplete="off" value={claveOperador} onChange={(e) => setClaveOperador(e.target.value)} placeholder="Clave del operador" className="border border-slate-300 rounded-lg p-2" />
-              </div>
-              <button type="button" onClick={handleGuardarPerfil} disabled={guardandoPerfil || !operador || !claveOperador} className="bg-blue-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-2 font-semibold">
-                {guardandoPerfil ? "Guardando..." : "Guardar perfil"}
-              </button>
-              {estadoGuardado && <p role="status" className="text-slate-700">{estadoGuardado}</p>}
-            </div>}
           </div>
         )}
 
@@ -530,19 +335,17 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
             <div />
           )}
 
-          {pasoActual < 4 ? (
+          {pasoActual < 3 ? (
             <button
               type="button"
               onClick={handleSiguiente}
               disabled={
                 (pasoActual === 1 && !puedeAvanzarPaso1) ||
-                (pasoActual === 2 && !puedeAvanzarPaso2) ||
-                (pasoActual === 3 && !puedeAvanzarPaso3)
+                (pasoActual === 2 && !puedeAvanzarPaso2)
               }
               className={`py-2.5 px-5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
                 (pasoActual === 1 && puedeAvanzarPaso1) ||
-                (pasoActual === 2 && puedeAvanzarPaso2) ||
-                (pasoActual === 3 && puedeAvanzarPaso3)
+                (pasoActual === 2 && puedeAvanzarPaso2)
                   ? "bg-blue-700 hover:bg-blue-800 text-white shadow-sm cursor-pointer"
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
               }`}
@@ -553,9 +356,9 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
           ) : (
             <button
               type="submit"
-              disabled={cargando || !estadoRuc.valido}
+              disabled={cargando || !estadoRuc.valido || !tipoRegimen || !puedeAvanzarPaso3}
               className={`py-2.5 px-5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
-                cargando || !estadoRuc.valido
+                cargando || !estadoRuc.valido || !tipoRegimen || !puedeAvanzarPaso3
                   ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                   : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow cursor-pointer"
               }`}

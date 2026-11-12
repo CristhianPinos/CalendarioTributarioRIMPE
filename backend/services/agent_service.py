@@ -7,21 +7,19 @@ Implementa un Bucle ReAct Autónomo (Reasoning + Action) con:
 1. Cuatro herramientas formales tipadas mediante esquemas Pydantic.
 2. Selección dinámica de herramientas con manejo de trazas y observaciones.
 3. Precisión financiera con Decimal (ROUND_HALF_UP).
-4. Fundamentación normativa estricta mediante el motor RAG.
+4. Referencias normativas verificadas para los recordatorios y consulta RAG separada.
 5. Límite de iteraciones configurable (control de loops).
 6. Compuerta obligatoria de confirmación humana (Human-in-the-Loop - HITL).
 7. Lectura de parámetros desacoplados desde config/parametros.yaml.
-8. Despacho de correo transaccional SMTP autenticado (Microsoft 365 / Office 365 / Gmail).
+8. Despacho de correo transaccional por la API HTTPS de Mailjet.
 """
 
 import os
+from html import escape
 import json
 import logging
-import smtplib
 from uuid import uuid4
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, EmailStr, field_validator
@@ -37,7 +35,9 @@ from backend.services.calculator import (
     calcular_vencimientos as calc_vencimientos_core,
     validar_ruc_persona_natural
 )
-from backend.services.rag_service import responder_con_rag
+from backend.services.llm import BASE_LEGAL_POR_OBLIGACION
+from backend.services import mailjet_service
+from backend.services.agent_planner import seleccionar_herramienta
 
 logger = logging.getLogger("rimpe.agent_service")
 
@@ -90,6 +90,8 @@ class RedactarRecordatorioInput(BaseModel):
     razon_social: str = Field(default="Estimado contribuyente", description="Nombre o razón social")
     tipo_regimen: str = Field(..., description="RIMPE_NEGOCIO_POPULAR o RIMPE_EMPRENDEDOR")
     fecha_vencimiento: str = Field(..., description="Fecha límite calculada en formato YYYY-MM-DD")
+    titulo_obligacion: Optional[str] = Field(default=None, description="Título del evento calculado")
+    anio_fiscal: Optional[int] = Field(default=None, ge=2024, le=2030)
     monto_estimado: Optional[float] = Field(None, description="Monto estimado de impuesto si aplica")
 
 
@@ -174,42 +176,48 @@ def tool_calcular_iva(params: CalcularIVAInput) -> CalcularIVAOutput:
 
 def tool_redactar_recordatorio(params: RedactarRecordatorioInput) -> RedactarRecordatorioOutput:
     """
-    Herramienta 3: Redacta un recordatorio pedagógico y formal para el contribuyente.
-    Consulta el motor RAG para fundamentar cada recordatorio con su cita de ley obligatoria.
+    Herramienta 3: Redacta un recordatorio para la obligación seleccionada.
+    Usa referencias legales verificadas del mismo catálogo que el modal.
     """
-    pregunta_normativa = f"¿Cuándo y cómo se presenta la obligación {params.codigo_obligacion} para {params.tipo_regimen}?"
-    respuesta_rag = responder_con_rag(pregunta=pregunta_normativa, regimen=params.tipo_regimen, top_k=2)
-
-    citas = [c.cita_oficial for c in respuesta_rag.citas] if respuesta_rag.citas else ["[LRTI, Art. 97.6]"]
-    citas_str = " ".join(citas)
-
-    if "IVA" in params.codigo_obligacion:
-        asunto = f"Recordatorio Tributario SRI: Declaración Semestral de IVA ({params.fecha_vencimiento})"
-        instruccion_pago = (
-            "Recuerde que si no registró ventas ni compras en este período, debe presentar "
-            "su declaración informativa en cero para evitar sanciones del SRI."
-        )
-    elif "RENTA" in params.codigo_obligacion:
-        asunto = f"Recordatorio Tributario SRI: Declaración Anual de Impuesto a la Renta ({params.fecha_vencimiento})"
-        instruccion_pago = (
-            "Prepare el consolidado de sus ingresos brutos gravados del ejercicio fiscal 2026. "
-            "La tarifa aplicable se calculará según las tablas progresivas vigentes de la Ley de Eficiencia Económica."
-        )
-    else:
-        asunto = f"Aviso de Vencimiento Tributario SRI - {params.fecha_vencimiento}"
-        instruccion_pago = "Revise el portal oficial de SRI en Línea con su usuario y clave."
-
-    monto_texto = f"\nMonto estimado preliminar: ${params.monto_estimado:.2f} USD." if params.monto_estimado is not None else ""
+    codigo = params.codigo_obligacion
+    fecha = date.fromisoformat(params.fecha_vencimiento)
+    anio = params.anio_fiscal or (fecha.year - 1 if codigo in {
+        "IVA_SEMESTRAL_2", "RENTA_ANUAL_EMPRENDEDOR", "RENTA_ANUAL_NEGOCIO_POPULAR"
+    } else fecha.year)
+    titulos = {
+        "IVA_SEMESTRAL_1": "Declaración semestral de IVA (enero-junio)",
+        "IVA_SEMESTRAL_2": "Declaración semestral de IVA (julio-diciembre)",
+        "RENTA_ANUAL_EMPRENDEDOR": "Declaración anual de renta RIMPE Emprendedor",
+        "RENTA_ANUAL_NEGOCIO_POPULAR": "Declaración anual de renta RIMPE Negocio Popular",
+        "IVA_REGIMEN_GENERAL_MIXTO": "IVA por actividades excluidas del RIMPE",
+    }
+    titulo = params.titulo_obligacion or titulos.get(codigo, "Obligación tributaria")
+    detalle_ejercicio = "" if f"ejercicio fiscal {anio}" in titulo.lower() else f" (ejercicio fiscal {anio})"
+    asunto = f"Recordatorio Calendario RIMPE: {titulo} ({params.fecha_vencimiento})"
+    instrucciones = {
+        "IVA_SEMESTRAL_1": f"Revisa tus comprobantes de ventas y adquisiciones de enero a junio de {anio}. Contrasta los datos precargados y presenta la declaración de IVA que corresponda en SRI en Línea.",
+        "IVA_SEMESTRAL_2": f"Revisa tus comprobantes de ventas y adquisiciones de julio a diciembre de {anio}. Contrasta los datos precargados y presenta la declaración de IVA que corresponda en SRI en Línea.",
+        "RENTA_ANUAL_EMPRENDEDOR": f"Revisa tus ingresos del ejercicio fiscal {anio}, descuentos, devoluciones y retenciones aplicables. Verifica el formulario de renta y el importe calculado antes de presentar la declaración en SRI en Línea.",
+        "RENTA_ANUAL_NEGOCIO_POPULAR": f"Revisa los ingresos de tu actividad durante el ejercicio fiscal {anio} y verifica en SRI en Línea la declaración y la cuota que correspondan a tu caso.",
+        "IVA_REGIMEN_GENERAL_MIXTO": "Consulta en tu RUC las obligaciones de IVA de las actividades excluidas del RIMPE. Confirma en SRI en Línea la periodicidad, el formulario y la fecha aplicable antes de declarar.",
+    }
+    accion = instrucciones.get(codigo, "Consulta las obligaciones activas de tu RUC y verifica el trámite aplicable en SRI en Línea.")
+    referencia = BASE_LEGAL_POR_OBLIGACION.get(codigo)
+    citas = [f"[{referencia}]"] if referencia else []
+    linea_fecha = (
+        f"Fecha orientativa mostrada en este calendario: {params.fecha_vencimiento}. Confirma la fecha aplicable en SRI en Línea."
+        if codigo == "IVA_REGIMEN_GENERAL_MIXTO"
+        else f"Fecha de vencimiento calculada por el calendario: {params.fecha_vencimiento}."
+    )
 
     cuerpo = (
         f"Estimado(a) {params.razon_social} (RUC: {params.ruc[:4]}****{params.ruc[10:]}),\n\n"
-        f"Le informamos que de acuerdo al calendario tributario oficial del SRI, su obligación "
-        f"'{params.codigo_obligacion}' correspondiente al Régimen {params.tipo_regimen} "
-        f"vence el próximo {params.fecha_vencimiento}.\n\n"
-        f"{instruccion_pago}{monto_texto}\n\n"
-        f"Base Legal y Citas Obligatorias:\n{citas_str}\n\n"
-        f"Nota: Este mensaje ha sido redactado por el Asistente Inteligente RIMPE y requiere su "
-        f"confirmación antes de registrarse en la bitácora de despachos oficiales."
+        f"Obligación: {titulo}{detalle_ejercicio}.\n"
+        f"{linea_fecha}\n\n"
+        f"Acción sugerida: {accion}\n\n"
+        + (f"Referencia normativa: {citas[0]}\n\n" if citas else "")
+        + "Recordatorio informativo de Calendario RIMPE. El envío se realiza únicamente tras la autorización del usuario. "
+        "No constituye una comunicación oficial del SRI."
     )
 
     return RedactarRecordatorioOutput(
@@ -226,7 +234,7 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
     """
     Herramienta 4: Despacha el recordatorio con COMPUERTA OBLIGATORIA de confirmación humana (HITL).
     Si confirmacion_usuario es False, NO despacha y retorna estado PENDIENTE_CONFIRMACION.
-    ENVIADO significa que el servidor SMTP aceptó el mensaje, no que llegó a la bandeja.
+    ENVIADO significa que Mailjet aceptó el mensaje, no que llegó a la bandeja.
     """
     ts = datetime.now(timezone.utc).isoformat()
 
@@ -244,25 +252,8 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
 
     id_auditoria = f"AUD-DISPATCH-{uuid4().hex}"
 
-    # Lectura de credenciales SMTP desde entorno (.env)
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port_raw = os.getenv("SMTP_PORT", "587")
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    smtp_from_email = os.getenv("SMTP_FROM_EMAIL", smtp_user)
-    smtp_from_name = os.getenv("SMTP_FROM_NAME", "Calendario Tributario SRI RIMPE").strip('"\'')
-    smtp_use_tls = os.getenv("SMTP_USE_TLS", "True").lower() in ("true", "1", "t", "yes")
-
-    if smtp_host and smtp_user and smtp_password:
-        accepted = False
-        sending = False
+    if mailjet_service.configurado():
         try:
-            smtp_port = int(smtp_port_raw)
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = params.asunto
-            msg["From"] = f'"{smtp_from_name}" <{smtp_from_email}>'
-            msg["To"] = params.destinatario
-
             cuerpo_texto = f"{params.texto}\n\nID Auditoría: {id_auditoria}"
             cuerpo_html = f"""
             <!DOCTYPE html>
@@ -273,11 +264,11 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
             <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px;">
               <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                 <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e1b4b 100%); color: #ffffff; padding: 24px 28px;">
-                  <h1 style="margin: 0; font-size: 18px; font-weight: 700;">{smtp_from_name}</h1>
-                  <p style="margin: 4px 0 0 0; font-size: 12px; color: #93c5fd;">Notificación Oficial - SRI Ecuador 2026</p>
+                  <h1 style="margin: 0; font-size: 18px; font-weight: 700;">{escape(os.getenv('MAILJET_FROM_NAME', 'Calendario RIMPE'))}</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 12px; color: #93c5fd;">Recordatorio informativo tributario</p>
                 </div>
                 <div style="padding: 28px; color: #1e293b; font-size: 14px; line-height: 1.6;">
-                  <div style="white-space: pre-wrap; margin-bottom: 24px;">{params.texto}</div>
+                  <div style="white-space: pre-wrap; margin-bottom: 24px;">{escape(params.texto)}</div>
                   <div style="padding: 14px 18px; background-color: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 6px; font-size: 12px; color: #475569;">
                     <strong>Confirmación HITL Registrada:</strong> Este recordatorio fue autorizado formalmente por el usuario en el asistente tributario interactivo.
                   </div>
@@ -290,37 +281,24 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
             </html>
             """
 
-            msg.attach(MIMEText(cuerpo_texto, "plain", "utf-8"))
-            msg.attach(MIMEText(cuerpo_html, "html", "utf-8"))
-
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-                if smtp_use_tls:
-                    server.starttls()
-                server.login(smtp_user, smtp_password)
-                sending = True
-                refused = server.sendmail(smtp_from_email, [params.destinatario], msg.as_string())
-                if refused:
-                    sending = False
-                    raise ValueError("El servidor SMTP rechazó al destinatario.")
-                accepted = True
-
-            logger.info(f"Servidor SMTP aceptó el correo. Audit ID: {id_auditoria}")
-
-        except Exception:
-            if accepted:
-                logger.warning("SMTP aceptó el mensaje pero falló el cierre de conexión. Audit ID: %s", id_auditoria)
-            else:
-                estado = "ESTADO_INCIERTO" if sending else "ERROR_ENVIO"
-                logger.error("No se pudo confirmar el despacho SMTP. Estado: %s. Audit ID: %s", estado, id_auditoria)
-                return EnviarRecordatorioOutput(
-                    estado=estado, destinatario=params.destinatario, canal=params.canal,
-                    confirmado=True, mensaje_accion=(
-                        "No se pudo determinar si SMTP aceptó el mensaje; revise el servidor antes de reintentar."
-                        if sending else "El envío SMTP falló antes de transmitir el mensaje; puede reintentarse."
-                    ), timestamp=ts, id_registro_auditoria=id_auditoria,
-                )
+            message_id = mailjet_service.enviar_correo(params.destinatario, params.asunto, cuerpo_texto, cuerpo_html)
+            logger.info("Mailjet aceptó el correo. Audit ID: %s; MessageID: %s", id_auditoria, message_id)
+        except mailjet_service.MailjetUncertainError:
+            logger.warning("Resultado de Mailjet incierto. Audit ID: %s", id_auditoria)
+            return EnviarRecordatorioOutput(
+                estado="ESTADO_INCIERTO", destinatario=params.destinatario, canal=params.canal,
+                confirmado=True, mensaje_accion="No se pudo confirmar si Mailjet aceptó el mensaje; revise el proveedor antes de reintentar.",
+                timestamp=ts, id_registro_auditoria=id_auditoria,
+            )
+        except mailjet_service.MailjetError:
+            logger.error("Mailjet rechazó el envío. Audit ID: %s", id_auditoria)
+            return EnviarRecordatorioOutput(
+                estado="ERROR_ENVIO", destinatario=params.destinatario, canal=params.canal,
+                confirmado=True, mensaje_accion="Mailjet rechazó el envío antes de aceptarlo; puede reintentarse.",
+                timestamp=ts, id_registro_auditoria=id_auditoria,
+            )
     else:
-        logger.warning("SMTP no configurado. Envío simulado. Audit ID: %s", id_auditoria)
+        logger.warning("Mailjet no configurado. Envío simulado. Audit ID: %s", id_auditoria)
         return EnviarRecordatorioOutput(
             estado="SIMULADO", destinatario=params.destinatario, canal=params.canal,
             confirmado=True, mensaje_accion="Aprobación registrada en modo simulación; no se envió ningún correo.",
@@ -332,7 +310,7 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
         destinatario=params.destinatario,
         canal=params.canal,
         confirmado=True,
-        mensaje_accion="El servidor SMTP aceptó el recordatorio para su entrega.",
+        mensaje_accion="Mailjet aceptó el recordatorio para su entrega.",
         timestamp=ts,
         id_registro_auditoria=id_auditoria
     )
@@ -347,6 +325,8 @@ class TrazaEjecucionHerramienta(BaseModel):
     entradas: Dict[str, Any]
     salidas: Dict[str, Any]
     timestamp: str
+    origen_seleccion: str = "flujo_seguro"
+    herramientas_permitidas: List[str] = Field(default_factory=list)
 
 
 class ResultadoAgente(BaseModel):
@@ -367,16 +347,18 @@ class AgenteTributarioRIMPE:
     Selecciona dinámicamente qué herramienta ejecutar según el estado de la meta,
     registra trazas de ejecución estructuradas y respeta límites estrictos de iteración y HITL.
     """
-    def __init__(self, max_iteraciones: Optional[int] = None):
+    def __init__(self, max_iteraciones: Optional[int] = None, usar_seleccion_gemini: bool = False):
         cfg_agente = get_parametros_agente_flujo()
         self.max_iteraciones = max_iteraciones or cfg_agente.get("max_iteraciones_agente", 5)
+        self.usar_seleccion_gemini = usar_seleccion_gemini
 
     def ejecutar(
         self,
         instruccion: str,
         perfil: Dict[str, Any],
         base_imponible_iva: Optional[float] = None,
-        confirmacion_envio: bool = False
+        confirmacion_envio: bool = False,
+        codigo_obligacion: Optional[str] = None,
     ) -> ResultadoAgente:
         """
         Bucle ReAct principal:
@@ -405,17 +387,24 @@ class AgenteTributarioRIMPE:
                 # ------------------------------------------------------------------
                 # FASE REASON: Decidir siguiente acción basada en el contexto actual
                 # ------------------------------------------------------------------
+                disponibles = []
                 if estado_contexto["vencimientos"] is None:
-                    herramienta_a_ejecutar = "calcular_vencimientos"
-                elif base_imponible_iva is not None and estado_contexto["iva"] is None:
-                    herramienta_a_ejecutar = "calcular_iva"
-                elif estado_contexto["recordatorio"] is None:
-                    herramienta_a_ejecutar = "redactar_recordatorio"
-                elif estado_contexto["envio"] is None:
-                    herramienta_a_ejecutar = "enviar_recordatorio"
+                    disponibles.append("calcular_vencimientos")
                 else:
-                    # Todas las tareas requeridas por la instrucción han concluido
+                    if base_imponible_iva is not None and estado_contexto["iva"] is None:
+                        disponibles.append("calcular_iva")
+                    if estado_contexto["recordatorio"] is None:
+                        disponibles.append("redactar_recordatorio")
+                    if (estado_contexto["recordatorio"] is not None
+                            and (base_imponible_iva is None or estado_contexto["iva"] is not None)
+                            and estado_contexto["envio"] is None):
+                        disponibles.append("enviar_recordatorio")
+                if not disponibles:
                     break
+                herramienta_a_ejecutar, origen_seleccion = seleccionar_herramienta(
+                    disponibles, [traza.herramienta for traza in trazas],
+                    usar_gemini=self.usar_seleccion_gemini,
+                )
 
                 iteraciones += 1
 
@@ -435,7 +424,8 @@ class AgenteTributarioRIMPE:
                         herramienta="calcular_vencimientos",
                         entradas=anonimizar_traza(inp_venc.model_dump()),
                         salidas=anonimizar_traza(out_venc.model_dump()),
-                        timestamp=datetime.now(timezone.utc).isoformat()
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        origen_seleccion=origen_seleccion, herramientas_permitidas=disponibles,
                     ))
 
                     if not out_venc.eventos:
@@ -459,12 +449,23 @@ class AgenteTributarioRIMPE:
                         herramienta="calcular_iva",
                         entradas=anonimizar_traza(inp_iva.model_dump()),
                         salidas=anonimizar_traza(out_iva.model_dump()),
-                        timestamp=datetime.now(timezone.utc).isoformat()
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        origen_seleccion=origen_seleccion, herramientas_permitidas=disponibles,
                     ))
 
                 elif herramienta_a_ejecutar == "redactar_recordatorio":
                     venc = estado_contexto["vencimientos"]
-                    proxima = venc.eventos[0]
+                    proxima = next(
+                        (evento for evento in venc.eventos if evento["codigo_obligacion"] == codigo_obligacion),
+                        None,
+                    ) if codigo_obligacion else venc.eventos[0]
+                    if proxima is None:
+                        return ResultadoAgente(
+                            instruccion_original=instruccion, exito=False,
+                            num_iteraciones=iteraciones, limite_alcanzado=False,
+                            trazas_herramientas=trazas,
+                            respuesta_final="La obligación seleccionada no corresponde al perfil calculado.",
+                        )
                     monto_iva_val = estado_contexto["iva"].monto_iva if estado_contexto["iva"] else None
 
                     inp_redactar = RedactarRecordatorioInput(
@@ -473,7 +474,9 @@ class AgenteTributarioRIMPE:
                         razon_social=razon_social,
                         tipo_regimen=tipo_regimen,
                         fecha_vencimiento=proxima["fecha_vencimiento"],
-                        monto_estimado=monto_iva_val
+                        monto_estimado=monto_iva_val,
+                        titulo_obligacion=proxima["titulo"],
+                        anio_fiscal=venc.anio_fiscal,
                     )
                     out_redactar = tool_redactar_recordatorio(inp_redactar)
                     estado_contexto["recordatorio"] = out_redactar
@@ -481,7 +484,8 @@ class AgenteTributarioRIMPE:
                         herramienta="redactar_recordatorio",
                         entradas=anonimizar_traza(inp_redactar.model_dump()),
                         salidas=anonimizar_traza(out_redactar.model_dump()),
-                        timestamp=datetime.now(timezone.utc).isoformat()
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        origen_seleccion=origen_seleccion, herramientas_permitidas=disponibles,
                     ))
 
                 elif herramienta_a_ejecutar == "enviar_recordatorio":
@@ -499,28 +503,28 @@ class AgenteTributarioRIMPE:
                         herramienta="enviar_recordatorio",
                         entradas=anonimizar_traza(inp_envio.model_dump()),
                         salidas=anonimizar_traza(out_envio.model_dump()),
-                        timestamp=datetime.now(timezone.utc).isoformat()
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        origen_seleccion=origen_seleccion, herramientas_permitidas=disponibles,
                     ))
 
             # Si el bucle terminó pero aún quedaban acciones pendientes en el plan
-            if (
-                estado_contexto["envio"] is None
-                and (
-                    estado_contexto["recordatorio"] is None
-                    or (base_imponible_iva is not None and estado_contexto["iva"] is None)
-                    or estado_contexto["vencimientos"] is None
-                )
-            ):
-                limite_alcanzado = (iteraciones >= self.max_iteraciones)
+            if estado_contexto["envio"] is None and iteraciones >= self.max_iteraciones:
+                limite_alcanzado = True
 
             # ------------------------------------------------------------------
             # SÍNTESIS DE LA RESPUESTA FINAL
             # ------------------------------------------------------------------
             out_envio = estado_contexto["envio"]
             venc = estado_contexto["vencimientos"]
-            proxima = venc.eventos[0] if (venc and venc.eventos) else {}
+            proxima = next(
+                (evento for evento in venc.eventos if evento["codigo_obligacion"] == codigo_obligacion),
+                {},
+            ) if (venc and codigo_obligacion) else (venc.eventos[0] if (venc and venc.eventos) else {})
 
-            if out_envio and out_envio.estado == "PENDIENTE_CONFIRMACION":
+            if limite_alcanzado:
+                respuesta_texto = "Se alcanzó el límite de pasos antes de preparar el recordatorio completo."
+                requiere_accion = True
+            elif out_envio and out_envio.estado == "PENDIENTE_CONFIRMACION":
                 respuesta_texto = (
                     f"Se calcularon {venc.total_obligaciones} obligaciones. Próximo vencimiento: "
                     f"{proxima.get('fecha_vencimiento')} ({proxima.get('titulo')}). "
@@ -546,7 +550,7 @@ class AgenteTributarioRIMPE:
 
             return ResultadoAgente(
                 instruccion_original=instruccion,
-                exito=True,
+                exito=not limite_alcanzado,
                 num_iteraciones=iteraciones,
                 limite_alcanzado=limite_alcanzado,
                 trazas_herramientas=trazas,

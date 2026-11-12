@@ -1,5 +1,7 @@
 # Documento de Arquitectura de Software: Calendario Tributario Inteligente RIMPE
 
+> **Nota de versión:** los diagramas de este documento describen el diseño de la fase 2. El flujo puntual local actual no monta la cola ni el planificador y utiliza la API HTTPS de Mailjet en lugar de SMTP; véanse ADR-010 y ADR-011 en `docs/09-decisiones.md`.
+
 | Metadato | Detalle |
 | :--- | :--- |
 | **Documento** | Diseño y Especificación de Arquitectura de Software (C4 + Flujos) |
@@ -82,6 +84,8 @@ flowchart LR
   6. **Capa de Routers de Negocio (`backend/routers/`):** Endpoints desacoplados (`obligaciones_router.py` para IA y simulación; `calendario_router.py` para integración con el frontend).
   7. **Compuerta de Envío (*Gatekeeper HITL*):** Endpoint de notificación que aborta con **HTTP 403 Forbidden** si la petición carece de la bandera `confirmado_por_usuario == True`.
 
+**Alcance local actual del agente:** `POST /api/agente/ejecutar` puede solicitar a Gemini una elección entre herramientas disponibles, determinadas por las dependencias del flujo en Python. Cada elección se valida, se traza y está sujeta a un máximo de iteraciones. Si falta la clave o falla Gemini, se aplica el orden seguro. Esta ruta no autoriza envíos. El correo puntual pasa por `/api/correo`, que verifica el código y la confirmación antes de ejecutar el recorrido determinista; no consulta al selector después de consumir el código. Los cálculos de fechas e IVA permanecen en Python.
+
 
 ---
 
@@ -102,7 +106,7 @@ C4Context
     System_Ext(llm_api, "API Modelo Generativo (LLM)", "Proveedor de inferencia para redacción en lenguaje sencillo bajo esquema Pydantic estricto.")
     System_Ext(smtp_service, "Servicio de Correo", "Infraestructura de entrega de notificaciones (despacho asíncrono).")
 
-    Rel(emprendedor, sistema_rimpe, "Registra perfil, visualiza calendario y confirma recordatorios", "HTTPS/Browser")
+    Rel(emprendedor, sistema_rimpe, "Genera calendario y consulta vencimientos", "HTTPS/Browser")
     Rel(sistema_rimpe, sri_normativa, "Lee configuración versionada y base de conocimiento", "JSON / Chunks RAG")
     Rel(sistema_rimpe, llm_api, "Solicita redacción pedagógica y estructurada", "HTTPS / JSON Tool Calling")
     Rel(sistema_rimpe, smtp_service, "Despacha alertas únicamente tras confirmación humana", "SMTP / Background Task")

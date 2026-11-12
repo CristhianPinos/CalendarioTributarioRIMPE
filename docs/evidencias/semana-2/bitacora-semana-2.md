@@ -3,7 +3,7 @@
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE  
 **Fase:** Fase 2 – Construcción del MVP e integración con IA generativa (Semana 2)  
 **Integrantes:**
-- Desarrollador A: Líder de Frontend e Integración Web
+- Juan Lucumi (Desarrollador A): Líder de Frontend e Integración Web
 - Cristhian Pinos (Desarrollador B): Líder de Backend Core, Arquitectura de IA & QA Lead  
 **Rama de Trabajo:** `feature/frontend-spa` (Full-Stack Integrado)  
 **Periodo:** Octubre 2026 / Fase 2 – Semana 2  

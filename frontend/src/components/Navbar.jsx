@@ -4,57 +4,10 @@
  * Caso N.º 11 – Grupo 11
  */
 
-import React, { useState, useEffect } from "react";
-import {
-  Calendar,
-  Calculator,
-  Sparkles,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  Scale,
-} from "lucide-react";
-import { verificarSaludBackend } from "../services/apiClient";
+import React from "react";
+import { Calendar, Calculator } from "lucide-react";
 
 export default function Navbar({ onAbrirSimulador }) {
-  const [backendStatus, setBackendStatus] = useState({
-    checking: true,
-    online: false,
-    version: null,
-  });
-
-  useEffect(() => {
-    chequearSalud();
-    const interval = setInterval(chequearSalud, 15000); // Polling suave cada 15s
-    return () => clearInterval(interval);
-  }, []);
-
-  const chequearSalud = async () => {
-    try {
-      const res = await verificarSaludBackend();
-      if (res.online) {
-        setBackendStatus({
-          checking: false,
-          online: true,
-          version: res.data?.version || "2.0.0",
-        });
-      } else {
-        setBackendStatus({
-          checking: false,
-          online: false,
-          version: null,
-        });
-      }
-    } catch {
-      setBackendStatus({
-        checking: false,
-        online: false,
-        version: null,
-      });
-    }
-  };
-
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,39 +27,13 @@ export default function Navbar({ onAbrirSimulador }) {
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Normativa SRI 2026 • Asistido por Google Gemini Flash
+                Calendario RIMPE • Explicaciones asistidas por IA cuando está disponible
               </p>
             </div>
           </div>
 
-          {/* Acciones y Estado del Sistema */}
+          {/* Acciones */}
           <div className="flex items-center space-x-3">
-            {/* Estado del Backend */}
-            <div className="hidden md:flex items-center">
-              {backendStatus.checking ? (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400">
-                  <div className="w-2 h-2 rounded-full bg-slate-400 animate-ping mr-1.5" />
-                  Conectando API...
-                </span>
-              ) : backendStatus.online ? (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
-                  API Activa (v{backendStatus.version})
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-950/80 text-amber-300 border border-amber-500/30">
-                  <AlertCircle className="w-3 h-3 mr-1 text-amber-400" />
-                  Modo Local
-                </span>
-              )}
-            </div>
-
-            {/* Insignia IA */}
-            <div className="hidden lg:flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-950/80 text-indigo-300 border border-indigo-500/30">
-              <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-400" />
-              <span>Gemini Flash 3.8</span>
-            </div>
-
             {/* Botón Acceso Rápido Simulador */}
             <button
               onClick={onAbrirSimulador}

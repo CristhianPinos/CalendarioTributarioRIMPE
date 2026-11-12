@@ -11,6 +11,7 @@ ni consumir cuota del proveedor de IA:
 """
 
 import pytest
+import httpx
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from backend.main import app
@@ -131,6 +132,21 @@ class TestApiValidacionErrores422:
 
 class TestApiResilienciaMocks:
     """Valida los reintentos Tenacity y la conmutación al fallback determinista."""
+
+    @patch("backend.services.llm._enviar_http_gemini")
+    def test_timeout_gemini_acotado_y_fallback(self, mock_gemini_post):
+        mock_gemini_post.side_effect = httpx.ReadTimeout("Proveedor sin respuesta")
+
+        response = client.post("/api/obligaciones/explicar", json={
+            "codigo_obligacion": "IVA_SEMESTRAL_1",
+            "tipo_regimen": "RIMPE_EMPRENDEDOR",
+            "fecha_vencimiento": "2026-07-20",
+        })
+
+        assert response.status_code == 200
+        assert response.json()["modelo_utilizado"] == "fallback-determinista-sri"
+        assert mock_gemini_post.call_count == 3
+        assert all(call.args[2] == 8.0 for call in mock_gemini_post.call_args_list)
 
     @patch("backend.services.llm._enviar_http_gemini")
     def test_error_429_activa_3_reintentos_y_entrega_fallback(self, mock_gemini_post):

@@ -82,8 +82,9 @@ export default function CalendarView({
           Tu Calendario Tributario Inteligente
         </h3>
         <p className="text-sm text-slate-500 max-w-md mb-6 leading-relaxed">
-          Ingresa tu RUC en el panel izquierdo para calcular de forma matemática y determinista
-          tus fechas de vencimiento ante el SRI, considerando tu noveno dígito y los feriados de Ecuador.
+          {cargando
+            ? "Calculando tus fechas de vencimiento ante el SRI..."
+            : "Completa los tres pasos del perfil del contribuyente y selecciona Generar Calendario Oficial para consultar tus fechas de vencimiento ante el SRI."}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg text-left">
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
@@ -152,33 +153,32 @@ export default function CalendarView({
   // Render personalizado de cada evento en la cuadrícula mensual
   const renderEventContent = (eventInfo) => {
     const props = eventInfo.event.extendedProps;
+    const tipo = props.codigo_obligacion?.includes("IVA")
+      ? "IVA"
+      : props.codigo_obligacion?.includes("RENTA")
+      ? "RENTA"
+      : "SRI";
     return (
       <div
-        className="w-full p-1.5 rounded-lg text-left shadow-xs transition-all hover:scale-[1.02] cursor-pointer overflow-hidden border border-white/20 select-none"
+        className="w-full min-w-0 p-1.5 rounded-lg text-left shadow-xs hover:brightness-110 cursor-pointer border border-white/20"
         style={{ backgroundColor: props.color_identificador || "#2563eb" }}
       >
         <div className="flex items-center justify-between gap-1 mb-1">
-          <span className="text-[9px] font-extrabold tracking-wider bg-white/25 text-white px-1.5 py-0.5 rounded uppercase">
-            {props.formulario_sri || "SRI"}
+          <span className="text-[10px] font-extrabold tracking-wider bg-white/25 text-white px-1.5 py-0.5 rounded">
+            {tipo}
           </span>
           {props.fue_trasladada && (
             <span
               title={`Trasladado: ${props.motivo_traslado}`}
-              className="inline-flex items-center text-[9px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded shadow-2xs"
+              aria-label="Fecha trasladada por prórroga"
+              className="inline-flex items-center bg-amber-400 text-slate-950 p-1 rounded"
             >
-              <AlertTriangle className="w-2.5 h-2.5 mr-0.5" />
-              PRÓRROGA
+              <AlertTriangle className="w-3 h-3" />
             </span>
           )}
         </div>
-        <div className="text-[11px] font-bold text-white leading-tight line-clamp-2 drop-shadow-xs">
+        <div className="text-xs font-bold text-white leading-snug whitespace-normal break-words [overflow-wrap:anywhere]">
           {eventInfo.event.title}
-        </div>
-        <div className="mt-1 flex items-center justify-between text-[10px] text-white/90 pt-1 border-t border-white/20">
-          <span className="font-mono font-medium">{props.fecha_vencimiento}</span>
-          <span className="text-[9px] font-semibold flex items-center">
-            Ver pasos <ArrowRight className="w-2.5 h-2.5 ml-0.5" />
-          </span>
         </div>
       </div>
     );
@@ -241,10 +241,9 @@ export default function CalendarView({
         </div>
       </div>
 
-      {/* Contenedor Principal: Calendario Interactivo + Resumen de Vencimientos */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-        {/* FullCalendar Grid (3 Columnas) */}
-        <div className="lg:col-span-3 bg-white rounded-2xl shadow-xs border border-slate-200 p-5 flex flex-col space-y-4">
+      {/* Calendario y lista de vencimientos */}
+      <div className="space-y-5">
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 sm:p-5 flex flex-col space-y-4">
           
           {/* BARRA SUPERIOR DE NAVEGACIÓN Y CONTROLES PERSONALIZADOS */}
           <div className="bg-gradient-to-r from-slate-50 via-blue-50/40 to-slate-50 p-4 rounded-2xl border border-slate-200">
@@ -362,7 +361,8 @@ export default function CalendarView({
           </div>
 
           {/* CUADRÍCULA FULLCALENDAR */}
-          <div className="calendar-container">
+          <p className="text-xs text-slate-500 sm:hidden">Desliza la cuadrícula horizontalmente para leer todos los días.</p>
+          <div className="calendar-container" role="region" aria-label="Calendario mensual desplazable horizontalmente" tabIndex={0}>
             <FullCalendar
               key={`${calendarioData.ruc || "cal"}-${calendarioData.anio_fiscal || 2026}`}
               ref={calendarRef}
@@ -385,12 +385,16 @@ export default function CalendarView({
               datesSet={handleDatesSet}
               events={eventosFullCalendar}
               eventContent={renderEventContent}
+              eventDidMount={(info) => {
+                info.el.title = `${info.event.title}. Vence el ${info.event.extendedProps.fecha_vencimiento}.`;
+                info.el.setAttribute("aria-label", info.el.title);
+              }}
               eventClick={(info) => {
                 info.jsEvent.preventDefault();
                 onSelectObligacion(info.event.extendedProps);
               }}
               height="auto"
-              dayMaxEvents={3}
+              dayMaxEvents={false}
             />
           </div>
 
@@ -399,8 +403,8 @@ export default function CalendarView({
           </div>
         </div>
 
-        {/* Panel Lateral: Lista de Obligaciones Ordenadas (1 Columna) */}
-        <div className="lg:col-span-1 space-y-3">
+        {/* Lista de obligaciones ordenadas */}
+        <div className="space-y-3">
           <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4">
             <h4 className="font-bold text-xs uppercase tracking-wider text-slate-700 mb-3 flex items-center">
               <Clock className="w-4 h-4 mr-1.5 text-blue-700" />
@@ -426,14 +430,14 @@ export default function CalendarView({
                     </span>
                   </div>
 
-                  <h5 className="font-bold text-xs text-slate-800 group-hover:text-blue-800 transition-colors line-clamp-2">
+                  <h5 className="font-bold text-xs text-slate-800 group-hover:text-blue-800 transition-colors whitespace-normal break-words">
                     {evento.titulo}
                   </h5>
 
                   {evento.fue_trasladada && (
                     <div className="mt-1.5 flex items-center text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                       <AlertTriangle className="w-3 h-3 mr-1 flex-shrink-0" />
-                      <span className="truncate">{evento.motivo_traslado}</span>
+                      <span className="break-words">{evento.motivo_traslado}</span>
                     </div>
                   )}
 

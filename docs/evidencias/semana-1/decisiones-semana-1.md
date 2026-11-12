@@ -3,7 +3,7 @@
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE (Caso 11 - Grupo 11)  
 **Fase:** Fase 1 – Definición del problema y diseño de la solución inteligente (Semana 1)  
 **Integrantes:**
-- Desarrollador A: Líder de Frontend e Integración Web
+- Juan Lucumi (Desarrollador A): Líder de Frontend e Integración Web
 - Cristhian Pinos (Desarrollador B): Líder de Backend Core, Arquitectura de IA y QA  
 **Periodo:** Octubre 2026 / Fase 1 – Semana 1  
 **Estado de Entrega:** 100% Cumplido según Checklist Oficial  
@@ -98,9 +98,9 @@ A continuación se detalla el cumplimiento estricto de cada uno de los ítems de
 
 ## 4. Acuerdos Técnicos del Equipo para el Traspaso a la Fase 2
 
-1. **Desacoplamiento Contractual (API-First):** Se definieron los contratos inmutables de entrada y salida (`POST /api/perfil/calcular-vencimientos` y `POST /api/obligaciones/explicar`) en [HANDOFF.md](../../../HANDOFF.md) para permitir desarrollo simultáneo e independiente.
+1. **Desacoplamiento Contractual (API-First):** Se definieron los contratos inmutables de entrada y salida (`POST /api/perfil/calcular-vencimientos` y `POST /api/obligaciones/explicar`) en `HANDOFF.md` para permitir desarrollo simultáneo e independiente.
 2. **Segregación de Ramas Git:**
-   - Desarrollador A: Rama `feature/frontend-spa` para la interfaz React + FullCalendar con mock integrado.
+   - Juan Lucumi (Desarrollador A): Rama `feature/frontend-spa` para la interfaz React + FullCalendar con mock integrado.
    - Cristhian Pinos (Desarrollador B): Rama `feature/backend-core-llm` para motor determinista, esquemas Pydantic v2, servicio Gemini y observabilidad LOPDP.
 3. **Cero Rutas Absolutas:** Todo el material documental y de configuración debe enlazarse estrictamente con rutas relativas portables del repositorio.
 4. **Protección de Secretos:** Prohibición estricta de subir claves de API (`.env`) o credenciales al control de versiones; uso obligatorio de `.env.example`.

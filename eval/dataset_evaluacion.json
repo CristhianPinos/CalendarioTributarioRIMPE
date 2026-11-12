@@ -34,7 +34,7 @@
       "fechas_esperadas": {
         "IVA_SEMESTRAL_1": "2026-07-13",
         "IVA_SEMESTRAL_2": "2027-01-12",
-        "RENTA_ANUAL_EMPRENDEDOR": "2027-03-12"
+        "RENTA_ANUAL_EMPRENDEDOR": "2027-05-12"
       },
       "motivo_esperado": "12 de julio es domingo, se traslada al lunes 13."
     },
@@ -49,9 +49,9 @@
       "fechas_esperadas": {
         "IVA_SEMESTRAL_1": "2026-07-14",
         "IVA_SEMESTRAL_2": "2027-01-14",
-        "RENTA_ANUAL_EMPRENDEDOR": "2027-03-15"
+        "RENTA_ANUAL_EMPRENDEDOR": "2027-05-14"
       },
-      "motivo_esperado": "14 de marzo 2027 es domingo, se traslada al lunes 15."
+      "motivo_esperado": "14 de mayo de 2027 es viernes; no requiere traslado."
     },
     {
       "id": "PERFIL-04",
@@ -77,7 +77,7 @@
       "fechas_esperadas": {
         "IVA_SEMESTRAL_1": "2026-07-20",
         "IVA_SEMESTRAL_2": "2027-01-18",
-        "RENTA_ANUAL_EMPRENDEDOR": "2027-03-18"
+        "RENTA_ANUAL_EMPRENDEDOR": "2027-05-18"
       },
       "motivo_esperado": "18 de julio es sábado, se traslada al lunes 20."
     },
@@ -106,7 +106,7 @@
         "IVA_SEMESTRAL_1": "2026-07-22",
         "IVA_REGIMEN_GENERAL_MIXTO": "2026-07-22",
         "IVA_SEMESTRAL_2": "2027-01-22",
-        "RENTA_ANUAL_EMPRENDEDOR": "2027-03-22"
+        "RENTA_ANUAL_EMPRENDEDOR": "2027-05-25"
       },
       "motivo_esperado": "Régimen mixto: genera IVA general y semestral el día 22."
     },
@@ -121,7 +121,7 @@
       "fechas_esperadas": {
         "IVA_SEMESTRAL_1": "2026-07-24",
         "IVA_SEMESTRAL_2": "2027-01-25",
-        "RENTA_ANUAL_EMPRENDEDOR": "2027-03-24"
+        "RENTA_ANUAL_EMPRENDEDOR": "2027-05-25"
       },
       "motivo_esperado": "24 de enero 2027 es domingo, se traslada al lunes 25."
     },
@@ -149,9 +149,9 @@
       "fechas_esperadas": {
         "IVA_SEMESTRAL_1": "2026-07-28",
         "IVA_SEMESTRAL_2": "2027-01-28",
-        "RENTA_ANUAL_EMPRENDEDOR": "2027-03-29"
+        "RENTA_ANUAL_EMPRENDEDOR": "2027-05-28"
       },
-      "motivo_esperado": "28 de marzo 2027 es domingo, se traslada al lunes 29."
+      "motivo_esperado": "28 de mayo de 2027 es viernes; no requiere traslado."
     }
   ],
   "preguntas_evaluacion": [
@@ -160,14 +160,15 @@
       "pregunta": "¿Qué tipo de comprobante de venta deben emitir los negocios populares del RIMPE?",
       "tipo": "con_respuesta",
       "debe_abstenerse": false,
-      "articulo_esperado": "Art. 97.8",
+      "articulo_esperado": "Art. 6",
       "cita_clave": "nota de venta",
       "regimen": "RIMPE_NEGOCIO_POPULAR",
       "articulos_validos": [
         "Art. 6",
-        "Art. 97.8",
-        "Art. 221",
         "Art. 223"
+      ],
+      "fuentes_esperadas": [
+        {"documento": "Resolución SRI NAC-DGERCGC24-00000027", "articulo": "Art. 6"}
       ]
     },
     {
@@ -175,14 +176,14 @@
       "pregunta": "Soy RIMPE negocio popular, ¿tengo que presentar declaraciones de IVA?",
       "tipo": "con_respuesta",
       "debe_abstenerse": false,
-      "articulo_esperado": "Art. 97.6",
+      "articulo_esperado": "Art. 97.9",
       "cita_clave": "no están obligados a presentar declaraciones de IVA",
       "regimen": "RIMPE_NEGOCIO_POPULAR",
       "articulos_validos": [
-        "Art. 7",
-        "Art. 97.6",
-        "Art. 221",
-        "Art. 6"
+        "Art. 97.9"
+      ],
+      "fuentes_esperadas": [
+        {"documento": "Ley de Régimen Tributario Interno (LRTI)", "articulo": "Art. 97.9"}
       ]
     },
     {
@@ -267,14 +268,14 @@
       "pregunta": "¿En qué mes presentan el impuesto a la renta las personas naturales del RIMPE Emprendedor?",
       "tipo": "con_respuesta",
       "debe_abstenerse": false,
-      "articulo_esperado": "Art. 97.6",
-      "cita_clave": "marzo",
+      "articulo_esperado": "Art. 8",
+      "cita_clave": "mayo",
       "regimen": "RIMPE_EMPRENDEDOR",
       "articulos_validos": [
-        "Art. 8",
-        "Art. 97.6",
-        "Art. 223",
-        "Art. 3"
+        "Art. 8"
+      ],
+      "fuentes_esperadas": [
+        {"documento": "Resolución SRI NAC-DGERCGC24-00000027", "articulo": "Art. 8"}
       ]
     },
     {
@@ -291,6 +292,9 @@
         "Art. 72",
         "Art. 254",
         "Art. 3"
+      ],
+      "fuentes_esperadas": [
+        {"documento": "Resolución SRI NAC-DGERCGC24-00000027", "articulo": "Art. 8"}
       ]
     },
     {
@@ -335,6 +339,9 @@
         "Art. 97.4",
         "Art. 8",
         "Art. 221"
+      ],
+      "fuentes_esperadas": [
+        {"documento": "Ley de Régimen Tributario Interno (LRTI)", "articulo": "Art. 97.4"}
       ]
     },
     {

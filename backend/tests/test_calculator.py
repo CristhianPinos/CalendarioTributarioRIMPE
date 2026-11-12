@@ -97,6 +97,9 @@ class TestMapeoNovenoDigito:
         assert fecha_nominal.day == dia_esperado, f"Dígito {noveno_digito} debe tener día base {dia_esperado}"
         assert fecha_nominal.month == 7
         assert fecha_nominal.year == 2026
+        evento_renta = next(e for e in resultado["eventos"] if e["codigo_obligacion"] == "RENTA_ANUAL_EMPRENDEDOR")
+        fecha_renta = date.fromisoformat(evento_renta["fecha_nominal"])
+        assert (fecha_renta.year, fecha_renta.month, fecha_renta.day) == (2027, 5, dia_esperado)
 
 
 # ==============================================================================
@@ -126,22 +129,22 @@ class TestTrasladoFechasInhabiles:
         assert fecha_venc.weekday() == 0  # Lunes
 
     def test_traslado_domingo_a_lunes(self):
-        # El 14 de Marzo de 2027 es DOMINGO (weekday == 6).
+        # El 14 de mayo de 2028 es DOMINGO (weekday == 6).
         # RUC con 9no dígito 3 -> día nominal 14.
-        # Para ejercicio fiscal 2026, Renta Emprendedor vence en marzo 2027.
+        # Para ejercicio fiscal 2027, Renta Emprendedor vence en mayo 2028.
         ruc_digito_3 = "0910000033001"
         resultado = calcular_vencimientos(
             ruc=ruc_digito_3,
             tipo_regimen="RIMPE_EMPRENDEDOR",
-            anio=2026
+            anio=2027
         )
         evento_renta = next(e for e in resultado["eventos"] if e["codigo_obligacion"] == "RENTA_ANUAL_EMPRENDEDOR")
         
-        assert evento_renta["fecha_nominal"] == "2027-03-14"
+        assert evento_renta["fecha_nominal"] == "2028-05-14"
         assert evento_renta["fue_trasladada"] is True
         assert "Domingo" in evento_renta["motivo_traslado"]
-        # Debe trasladarse al lunes 15 de marzo de 2027
-        assert evento_renta["fecha_vencimiento"] == "2027-03-15"
+        # Debe trasladarse al lunes 15 de mayo de 2028
+        assert evento_renta["fecha_vencimiento"] == "2028-05-15"
         fecha_venc = date.fromisoformat(evento_renta["fecha_vencimiento"])
         assert fecha_venc.weekday() == 0  # Lunes
 
@@ -270,14 +273,31 @@ class TestSimuladorRenta:
 
     def test_simulacion_negocio_popular_alerta_transicion_superior(self):
         sim = simular_cuota_renta(ingresos_brutos=25000.00, tipo_regimen="RIMPE_NEGOCIO_POPULAR")
-        assert sim["impuesto_causado"] == 60.00
+        assert sim["impuesto_causado"] == 110.00
         assert "alerta_transicion" in sim
-        assert "superan los $20.000,00 USD" in sim["alerta_transicion"]
+        assert "tabla de Emprendedor" in sim["alerta_transicion"]
 
-    def test_simulacion_emprendedor_rango_base(self):
-        # Ingreso hasta 20000 en Emprendedor
-        sim = simular_cuota_renta(ingresos_brutos=18000.00, tipo_regimen="RIMPE_EMPRENDEDOR")
-        assert sim["impuesto_causado"] == 60.00
+    @pytest.mark.parametrize("ingresos, cuota_esperada", [
+        (0.00, 0.00), (2500.00, 0.00), (2500.01, 5.00),
+        (10000.01, 35.00), (18000.00, 60.00), (20000.00, 60.00),
+    ])
+    def test_simulacion_emprendedor_hasta_20k_usa_tabla_de_cuotas(self, ingresos, cuota_esperada):
+        sim = simular_cuota_renta(ingresos_brutos=ingresos, tipo_regimen="RIMPE_EMPRENDEDOR")
+        assert sim["impuesto_causado"] == cuota_esperada
+        assert sim["cuota_fija_usd"] == cuota_esperada
+
+    def test_simulacion_negocio_popular_sobre_300k_no_da_cuota_rimpe(self):
+        with pytest.raises(ValueError, match="Régimen General"):
+            simular_cuota_renta(ingresos_brutos=300000.01, tipo_regimen="RIMPE_NEGOCIO_POPULAR")
+
+    def test_simulacion_rechaza_mas_de_dos_decimales(self):
+        with pytest.raises(ValueError, match="máximo dos decimales"):
+            simular_cuota_renta(ingresos_brutos=2500.001, tipo_regimen="RIMPE_NEGOCIO_POPULAR")
+
+    def test_simulacion_tramo_superior_usa_fraccion_basica_oficial(self):
+        sim = simular_cuota_renta(ingresos_brutos=200000.01, tipo_regimen="RIMPE_EMPRENDEDOR")
+        assert sim["fraccion_basica"] == 2797.52
+        assert sim["impuesto_causado"] == 2797.52
 
     def test_simulacion_emprendedor_tramo_20k_a_50k(self):
         # Ingresos: 30,000 USD

@@ -3,7 +3,7 @@
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE (Caso 11 - Grupo 11)  
 **Fase:** Fase 1 – Definición del problema y diseño de la solución inteligente (Semana 1)  
 **Integrantes:**
-- Desarrollador A: Líder de Frontend e Integración Web
+- Juan Lucumi (Desarrollador A): Líder de Frontend e Integración Web
 - Cristhian Pinos (Desarrollador B): Líder de Backend Core, Arquitectura de IA y QA Lead  
 **Rama Principal de Trabajo:** `main` (Inicialización de Repositorio y Arquitectura Base)  
 **Periodo:** Octubre 2026 / Fase 1 – Semana 1  
@@ -112,12 +112,12 @@
 
 ---
 
-### Paso 8: Gobernanza de Git, Documentación de Traspaso y Cierre de Semana ([HANDOFF.md](../../../HANDOFF.md))
+### Paso 8: Gobernanza de Git, Documentación de Traspaso y Cierre de Semana (`HANDOFF.md`)
 - Creación de `.gitignore` integral para proteger claves de API, entornos virtuales (`.venv`), archivos de caché de Python y carpetas pesadas.
 - Elaboración de `.env.example` definiendo las variables requeridas (`GEMINI_API_KEY`, `GEMINI_MODEL`, `PORT`, `ENVIRONMENT`).
-- Redacción del documento formal de traspaso [HANDOFF.md](../../../HANDOFF.md) detallando:
+- Redacción del documento formal de traspaso `HANDOFF.md` detallando:
   - Contratos de integración de la API (JSON de entrada y salida para cálculo de calendario y explicaciones didácticas).
-  - Asignación equitativa de responsabilidades para la Fase 2 (Desarrollador A en Frontend vs. Cristhian Pinos en Backend).
+  - Asignación equitativa de responsabilidades para la Fase 2 (Juan Lucumi en Frontend y Cristhian Pinos en Backend).
   - Identificación preventiva de riesgos (alucinaciones de fechas, rate limits HTTP 429, fallas de validación de RUC).
   - Estado de accesos (clave de Gemini confirmada y permisos de colaborador en GitHub).
 
@@ -183,6 +183,6 @@ print('Configuracion valida:', data['metadata']['ejercicio_fiscal'])
 
 ## 4. Conclusiones de la Semana 1
 
-1. **Fundamentos sólidos para desarrollo en paralelo:** La formalización de contratos de integración en [HANDOFF.md](../../../HANDOFF.md) y la separación de responsabilidades permitieron que el Desarrollador A (Frontend) y el Desarrollador B (Backend) puedan trabajar de manera independiente sin bloquearse mutuamente.
+1. **Fundamentos sólidos para desarrollo en paralelo:** La formalización de contratos de integración en `HANDOFF.md` y la separación de responsabilidades permitieron que Juan Lucumi (Desarrollador A, Frontend) y Cristhian Pinos (Desarrollador B, Backend) trabajaran de manera independiente sin bloquearse mutuamente.
 2. **Mitigación temprana del riesgo de alucinación:** Al definir en la arquitectura que las fechas se calculan de manera determinista en Python y nunca por inferencia del LLM, se erradicó de raíz la mayor causa de multas e inconformidad tributaria.
 3. **Cumplimiento total de la rúbrica:** La totalidad de los entregables de la Semana 1 fueron completados, estructurados y versionados en el repositorio de manera profesional y auditable.

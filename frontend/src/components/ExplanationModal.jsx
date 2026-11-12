@@ -4,7 +4,7 @@
  * Caso N.º 11 – Grupo 11
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Sparkles,
@@ -22,7 +22,10 @@ import {
   ExternalLink,
   Lock,
 } from "lucide-react";
-import { obtenerExplicacion, ejecutarAgente } from "../services/apiClient";
+import { obtenerExplicacion, solicitarCodigoCorreo, enviarRecordatorioVerificado } from "../services/apiClient";
+
+// Incluye el posible arranque en frío de Render Free y el límite del backend.
+const EXPLANATION_TIMEOUT_MS = 90_000;
 
 export default function ExplanationModal({
   isOpen,
@@ -31,39 +34,49 @@ export default function ExplanationModal({
   perfil,
 }) {
   const [cargando, setCargando] = useState(false);
+  const [esperaProlongada, setEsperaProlongada] = useState(false);
   const [error, setError] = useState(null);
   const [explicacionData, setExplicacionData] = useState(null);
+  const requestControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
   const [esDeclaracionEnCero, setEsDeclaracionEnCero] = useState(false);
 
   // Estados de la Compuerta HITL (Human-in-the-Loop) y Agente Autónomo
   const [confirmadoPorUsuario, setConfirmadoPorUsuario] = useState(false);
-  const [emailDestino, setEmailDestino] = useState(perfil?.email || "");
+  const [emailDestino, setEmailDestino] = useState("");
   const [recordatorioProgramado, setRecordatorioProgramado] = useState(false);
   const [enviandoHitl, setEnviandoHitl] = useState(false);
   const [resultadoAgente, setResultadoAgente] = useState(null);
-  const [operatorUser, setOperatorUser] = useState("");
-  const [operatorPassword, setOperatorPassword] = useState("");
+  const [errorEnvio, setErrorEnvio] = useState(null);
+  const [codigo, setCodigo] = useState("");
+  const [codigoSolicitado, setCodigoSolicitado] = useState(false);
+  const [solicitandoCodigo, setSolicitandoCodigo] = useState(false);
 
   // Cargar explicación cada vez que se abre el modal con una nueva obligación
   useEffect(() => {
     if (!isOpen || !obligacion) {
+      requestControllerRef.current?.abort();
+      requestIdRef.current += 1;
+      setCargando(false);
+      setEsperaProlongada(false);
       setExplicacionData(null);
       setError(null);
       setRecordatorioProgramado(false);
       setConfirmadoPorUsuario(false);
       setResultadoAgente(null);
-      setOperatorPassword("");
+      setErrorEnvio(null);
+      setCodigo("");
+      setCodigoSolicitado(false);
+      setEmailDestino("");
       return;
     }
 
     cargarExplicacion(esDeclaracionEnCero);
+    return () => {
+      requestControllerRef.current?.abort();
+      requestIdRef.current += 1;
+    };
   }, [isOpen, obligacion, esDeclaracionEnCero]);
-
-  useEffect(() => {
-    if (perfil?.email) {
-      setEmailDestino(perfil.email);
-    }
-  }, [perfil]);
 
   // Cerrar con tecla Escape
   useEffect(() => {
@@ -77,53 +90,87 @@ export default function ExplanationModal({
   }, [isOpen, onClose]);
 
   const cargarExplicacion = async (enCero) => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    const requestId = ++requestIdRef.current;
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, EXPLANATION_TIMEOUT_MS);
+    const progressTimer = setTimeout(() => {
+      if (requestId === requestIdRef.current) setEsperaProlongada(true);
+    }, 8_000);
     setCargando(true);
+    setEsperaProlongada(false);
     setError(null);
+    setExplicacionData(null);
 
     try {
       const payload = {
         codigo_obligacion: obligacion.codigo_obligacion,
         tipo_regimen: perfil.tipo_regimen,
         fecha_vencimiento: obligacion.fecha_vencimiento,
-        noveno_digito: perfil.noveno_digito,
-        ruc: perfil.ruc,
         es_declaracion_en_cero: enCero,
       };
 
-      const res = await obtenerExplicacion(payload);
-      setExplicacionData(res.data);
+      const res = await obtenerExplicacion(payload, { signal: controller.signal });
+      if (requestId === requestIdRef.current) setExplicacionData(res.data);
     } catch (err) {
-      setError(
-        err.message ||
-          "No se pudo cargar la explicación con IA. Por favor, reintente en unos momentos."
-      );
+      if (requestId === requestIdRef.current) {
+        setError(timedOut
+          ? "La explicación tardó demasiado. Puedes reintentar la consulta."
+          : err.status === 429 && err.retryAfterSeconds
+            ? `Se alcanzó el límite de consultas. Intenta de nuevo en ${err.retryAfterSeconds} segundos.`
+            : err.message || "No se pudo cargar la explicación. Por favor, reintenta en unos momentos.");
+      }
     } finally {
-      setCargando(false);
+      clearTimeout(timeout);
+      clearTimeout(progressTimer);
+      if (requestId === requestIdRef.current) {
+        requestControllerRef.current = null;
+        setCargando(false);
+        setEsperaProlongada(false);
+      }
+    }
+  };
+
+  const handleSolicitarCodigo = async () => {
+    if (!emailDestino.trim()) return;
+    setSolicitandoCodigo(true);
+    setErrorEnvio(null);
+    try {
+      const respuesta = await solicitarCodigoCorreo(emailDestino.trim());
+      setCodigoSolicitado(true);
+      if (respuesta.data.estado === "INCIERTO") setErrorEnvio(respuesta.data.mensaje);
+    } catch (err) {
+      setErrorEnvio(err.message || "No se pudo enviar el código.");
+    } finally {
+      setSolicitandoCodigo(false);
     }
   };
 
   const handleProgramarRecordatorio = async (e) => {
     e.preventDefault();
-    if (!confirmadoPorUsuario || !operatorUser.trim() || !operatorPassword) return;
+    if (!confirmadoPorUsuario || !emailDestino.trim() || !/^\d{6}$/.test(codigo)) return;
 
     setEnviandoHitl(true);
-    setError(null);
+    setErrorEnvio(null);
 
     try {
-      // Conexión real con el Agente Autónomo ReAct (/api/agente/ejecutar)
-      const res = await ejecutarAgente({
-        instruccion: `Calcular obligaciones, redactar y formalizar despacho para la obligación ${obligacion.codigo_obligacion}`,
+      const res = await enviarRecordatorioVerificado({
+        email: emailDestino.trim(),
+        codigo,
+        codigo_obligacion: obligacion.codigo_obligacion,
         perfil: {
-          ruc: perfil?.ruc || "0923456784001",
-          razon_social: perfil?.razon_social || "Contribuyente RIMPE",
-          tipo_regimen: perfil?.tipo_regimen || "RIMPE_EMPRENDEDOR",
-          email: emailDestino,
-          anio: perfil?.anio || 2026,
-          tiene_actividades_excluidas: Boolean(perfil?.tiene_actividades_excluidas),
+          ruc: perfil.ruc,
+          razon_social: perfil.razon_social,
+          tipo_regimen: perfil.tipo_regimen,
+          email: emailDestino.trim(),
+          tiene_actividades_excluidas: Boolean(perfil.tiene_actividades_excluidas),
         },
-        base_imponible_iva: obligacion.codigo_obligacion?.includes("IVA") ? 1000.0 : null,
-        confirmacion_envio: true, // Compuerta HITL aprobada por el usuario
-        operatorCredentials: { username: operatorUser.trim(), password: operatorPassword },
+        anio: perfil.anio || 2026,
       });
 
       if (!res.data.exito) {
@@ -131,9 +178,9 @@ export default function ExplanationModal({
       }
       setResultadoAgente(res.data);
       setRecordatorioProgramado(true);
-      setOperatorPassword("");
+      setCodigo("");
     } catch (err) {
-      setError(
+      setErrorEnvio(
         err.message || "No se pudo procesar la ejecución del agente tributario."
       );
     } finally {
@@ -144,11 +191,11 @@ export default function ExplanationModal({
   if (!isOpen || !obligacion) return null;
 
   const recordatorio = explicacionData?.obligacion || explicacionData?.recordatorio;
+  const admiteDeclaracionEnCero = ["IVA_SEMESTRAL_1", "IVA_SEMESTRAL_2"].includes(obligacion.codigo_obligacion);
   const esFallback =
     explicacionData?.fuente === "CATALOGO_DETERMINISTA_FALLBACK" ||
     explicacionData?.modelo_utilizado === "fallback-determinista-sri";
-  const modeloTexto =
-    explicacionData?.modelo || explicacionData?.modelo_utilizado || "gemini-3.8-flash";
+  const modeloTexto = explicacionData?.modelo_utilizado || explicacionData?.modelo || "Origen no informado";
   const tiempoTexto =
     explicacionData?.tiempo_generacion_ms !== undefined && explicacionData?.tiempo_generacion_ms !== null
       ? (explicacionData.tiempo_generacion_ms / 1000).toFixed(2)
@@ -201,7 +248,7 @@ export default function ExplanationModal({
         {/* Cuerpo del Modal con Scroll */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {/* Banner de Declaración en Cero Toggle */}
-          <div
+          {admiteDeclaracionEnCero && <div
             className={`border rounded-2xl p-4 transition-all duration-200 ${
               esDeclaracionEnCero
                 ? "bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-500/20 shadow-xs"
@@ -217,7 +264,7 @@ export default function ExplanationModal({
                   className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
                 />
                 <span>
-                  ¿No tuviste ventas ni compras en este período?{" "}
+                  ¿No tuviste ventas ni compras en este semestre?{" "}
                   <strong className={esDeclaracionEnCero ? "text-emerald-900" : "text-slate-900"}>
                     (Activar Modo Declaración en Cero)
                   </strong>
@@ -227,11 +274,7 @@ export default function ExplanationModal({
                 <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-2xs">
                   Modo en Cero Activo
                 </span>
-              ) : (
-                <span className="text-[11px] text-slate-400 hidden sm:inline">
-                  Art. 97.6 LRTI
-                </span>
-              )}
+              ) : null}
             </div>
 
             {/* Guía Visual Específica cuando está activado */}
@@ -239,34 +282,38 @@ export default function ExplanationModal({
               <div className="mt-3 pt-3 border-t border-emerald-200 text-xs space-y-2 animate-in fade-in duration-150">
                 <div className="flex items-start space-x-2 text-emerald-900 font-bold">
                   <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                  <span>¿Es obligatorio declarar si no vendí nada? Sí, 100% OBLIGATORIO.</span>
+                  <span>Revisa tu situación antes de declarar sin movimiento.</span>
                 </div>
                 <p className="text-emerald-800 text-[11px] leading-relaxed pl-6">
-                  Muchos emprendedores creen erróneamente que sin ventas no deben ingresar al sistema.
-                  En Ecuador, no declarar a tiempo genera una <strong>multa automática del SRI de $30 a $60 USD</strong> (Art. 100 LRTI),
-                  aunque el valor final a pagar de impuesto sea $0.00.
+                  Confirma que no hubo operaciones y consulta las obligaciones activas de tu RUC.
+                  No presupongas que el impuesto o una eventual sanción sean siempre de un importe fijo.
                 </p>
                 <div className="bg-white/80 rounded-xl p-2.5 border border-emerald-200/80 text-[11px] text-slate-700 space-y-1">
                   <span className="font-bold text-slate-900 block">
-                    Pasos rápidos para tu declaración en cero en sri.gob.ec:
+                    Antes de enviar en SRI en Línea:
                   </span>
                   <ol className="list-decimal list-inside space-y-0.5 text-slate-600 pl-1">
                     <li>Ingresa con RUC y clave a <em>Declaraciones &gt; Declaración de Impuestos</em>.</li>
                     <li>Selecciona el formulario correspondiente (<strong>{obligacion.formulario_sri}</strong>).</li>
-                    <li>En la pregunta <em>"¿Requiere registrar información para este período?"</em>, marca <strong>NO</strong>.</li>
-                    <li>El portal completará los casilleros en <strong>$0.00</strong>. Haz clic en <strong>Firmar y Enviar</strong>.</li>
+                    <li>Contrasta los datos precargados con tus registros del semestre.</li>
+                    <li>Si corresponde declarar sin movimiento, verifica el formulario antes de firmar y enviar.</li>
                   </ol>
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {cargando ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-3">
               <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
               <p className="text-xs text-slate-500 font-medium">
-                Consultando base legal RAG y generando explicación didáctica...
+                Solicitando explicación didáctica...
               </p>
+              {esperaProlongada && (
+                <p className="text-xs text-slate-500 text-center max-w-sm">
+                  La respuesta está tardando. Si Gemini no está disponible, mostraremos la explicación de contingencia.
+                </p>
+              )}
             </div>
           ) : error ? (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-start space-x-3">
@@ -293,7 +340,7 @@ export default function ExplanationModal({
                   <span className="uppercase text-[11px] tracking-wider">Resumen Explicativo</span>
                 </div>
                 <p className="text-slate-600 leading-relaxed text-xs">
-                  {recordatorio.resumen_didactico}
+                  {recordatorio.explicacion_sencilla || "No se recibió una explicación para esta obligación."}
                 </p>
               </div>
 
@@ -304,7 +351,7 @@ export default function ExplanationModal({
                   <span className="uppercase text-[11px] tracking-wider">Comprobantes y Documentos Válidos</span>
                 </div>
                 <p className="text-slate-600 leading-relaxed text-xs">
-                  {recordatorio.comprobantes_validos}
+                  {recordatorio.comprobantes_validos || "Consulta en el SRI los comprobantes que sustentan esta obligación."}
                 </p>
               </div>
 
@@ -325,7 +372,7 @@ export default function ExplanationModal({
                   <Lightbulb className="w-4 h-4 text-amber-500" />
                   <span className="uppercase text-[11px] tracking-wider">Sugerencia de Acción</span>
                 </div>
-                <p className="text-blue-900 text-xs leading-relaxed mb-2">
+                <p className="text-blue-900 text-xs leading-relaxed mb-2 whitespace-pre-line">
                   {recordatorio.sugerencia_accion}
                 </p>
                 {recordatorio.canal_recomendado && (
@@ -341,9 +388,8 @@ export default function ExplanationModal({
                 <div className="flex items-center space-x-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
                   <span>
-                    Generado con <strong>{modeloTexto}</strong>
+                    {esFallback ? "Explicación de contingencia: " : "Generado con "}<strong>{modeloTexto}</strong>
                     {tiempoTexto ? ` en ${tiempoTexto}s` : ""}
-                    {esFallback ? " (Modo Contingencia)" : ""}
                   </span>
                 </div>
                 <button
@@ -373,11 +419,11 @@ export default function ExplanationModal({
                       <div className="space-y-1">
                         <p className="font-bold">
                           {resultadoAgente?.estado_envio === "ENVIADO"
-                            ? "Recordatorio aceptado por el servidor SMTP"
+                            ? "Recordatorio aceptado por Mailjet para envío"
                             : resultadoAgente?.estado_envio === "SIMULADO"
                             ? "Aprobación registrada en modo simulación; no se envió correo"
                             : resultadoAgente?.estado_envio === "ESTADO_INCIERTO"
-                            ? "Resultado SMTP incierto; requiere revisión antes de reintentar"
+                            ? "Resultado de Mailjet incierto; requiere revisión antes de reintentar"
                             : "El correo no se envió; revise la configuración o reintente"}
                         </p>
                         <p className="text-[11px] leading-relaxed">
@@ -417,30 +463,6 @@ export default function ExplanationModal({
                   </div>
                 ) : (
                   <form onSubmit={handleProgramarRecordatorio} className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <label className="text-[11px] font-bold text-slate-600">
-                        Usuario operador
-                        <input
-                          type="text"
-                          autoComplete="username"
-                          required
-                          value={operatorUser}
-                          onChange={(e) => setOperatorUser(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
-                        />
-                      </label>
-                      <label className="text-[11px] font-bold text-slate-600">
-                        Contraseña operador
-                        <input
-                          type="password"
-                          autoComplete="current-password"
-                          required
-                          value={operatorPassword}
-                          onChange={(e) => setOperatorPassword(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
-                        />
-                      </label>
-                    </div>
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                         Correo de Notificación
@@ -450,12 +472,31 @@ export default function ExplanationModal({
                           type="email"
                           required
                           value={emailDestino}
-                          onChange={(e) => setEmailDestino(e.target.value)}
+                          onChange={(e) => {
+                            setEmailDestino(e.target.value);
+                            setCodigo("");
+                            setCodigoSolicitado(false);
+                          }}
                           placeholder="tu-correo@empresa.ec"
                           className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-100 outline-none"
                         />
                         <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <button type="button" onClick={handleSolicitarCodigo} disabled={solicitandoCodigo || !emailDestino.trim()}
+                        className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-800 disabled:opacity-50">
+                        {solicitandoCodigo ? "Enviando código..." : codigoSolicitado ? "Solicitar otro código" : "Enviar código de verificación"}
+                      </button>
+                      {codigoSolicitado && (
+                        <label className="block text-[11px] font-bold text-slate-600">
+                          Código recibido por correo
+                          <input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={codigo}
+                            onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+                            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs" />
+                        </label>
+                      )}
                     </div>
 
                     <label className="flex items-start space-x-2.5 cursor-pointer p-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
@@ -473,9 +514,9 @@ export default function ExplanationModal({
 
                     <button
                       type="submit"
-                      disabled={!confirmadoPorUsuario || !operatorUser.trim() || !operatorPassword || enviandoHitl}
+                      disabled={!confirmadoPorUsuario || !emailDestino.trim() || !/^\d{6}$/.test(codigo) || enviandoHitl}
                       className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
-                        confirmadoPorUsuario && operatorUser.trim() && operatorPassword && !enviandoHitl
+                        confirmadoPorUsuario && emailDestino.trim() && /^\d{6}$/.test(codigo) && !enviandoHitl
                           ? "bg-blue-700 hover:bg-blue-800 text-white shadow-sm hover:shadow cursor-pointer"
                           : "bg-slate-300 text-slate-500 cursor-not-allowed"
                       }`}
@@ -492,6 +533,7 @@ export default function ExplanationModal({
                         </>
                       )}
                     </button>
+                    {errorEnvio && <p role="alert" className="text-xs text-rose-700">{errorEnvio}</p>}
                   </form>
                 )}
               </div>

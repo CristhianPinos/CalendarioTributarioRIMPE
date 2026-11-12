@@ -26,9 +26,9 @@ export function validarRucPersonaNatural(ruc) {
     };
   }
 
-  // 2. Validación de código de provincia (primeros dos dígitos: 01 a 24, o 30)
+  // 2. Misma validación que el motor Python: código de provincia de 01 a 24.
   const provincia = parseInt(limpio.slice(0, 2), 10);
-  if ((provincia < 1 || provincia > 24) && provincia !== 30) {
+  if (provincia < 1 || provincia > 24) {
     return {
       valido: false,
       novenoDigito: null,

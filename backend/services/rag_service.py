@@ -110,7 +110,8 @@ class MotorRAG:
 
         with open(self.chunks_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            self.chunks = data.get("chunks", [])
+            # No recuperar secciones a las que la ingesta asignó una cita por mera mención interior.
+            self.chunks = [chunk for chunk in data.get("chunks", []) if chunk.get("cabecera_verificable")]
 
         # Indexar BM25
         self.tokenized_corpus = []
@@ -128,7 +129,7 @@ class MotorRAG:
 
         if self.chunks:
             self.avg_doc_len = total_len / len(self.chunks)
-        logger.info(f"RAG inicializado y balanceado con {len(self.chunks)} fragmentos normativos.")
+        logger.info("RAG inicializado con %s fragmentos citables.", len(self.chunks))
 
     def _tokenizar(self, texto: str) -> List[str]:
         """Tokeniza y normaliza caracteres Unicode y acentos."""
@@ -164,7 +165,8 @@ class MotorRAG:
 
         for idx, chunk in enumerate(self.chunks):
             # 1. PRE-FILTRO: Año fiscal 2026 y Vigente
-            if not chunk.get("vigente", True) or chunk.get("anio_fiscal") != 2026:
+            if (not chunk.get("vigente", True) or chunk.get("anio_fiscal") != 2026
+                    or not chunk.get("cabecera_verificable", False)):
                 continue
 
             # 2. PRE-FILTRO: Compatibilidad de Régimen
@@ -219,7 +221,7 @@ def responder_con_rag(
     - Evalúa filtros y compuertas de seguridad.
     - Recupera contexto con prefiltrado de metadatos.
     - Aplica la Regla de Silencio (Abstención) cuando corresponde.
-    - Genera la respuesta asegurando citas oficiales inquebrantables.
+    - Devuelve extractos con citas estructuradas de los fragmentos recuperados.
     """
     p_lower = pregunta.lower().strip()
 
@@ -283,7 +285,7 @@ def responder_con_rag(
     recuperados = _MOTOR_RAG_GLOBAL.recuperar(pregunta=pregunta, regimen=regimen, top_k=top_k)
 
     # 3. REGLA DE SILENCIO (Abstención):
-    # Si no hay candidatos o el puntaje máximo es inferior a 4.5, la consulta no está sustentada en las fuentes
+    # Si no hay candidatos o el puntaje máximo es inferior a 2.8, la consulta no alcanza el umbral léxico.
     if not recuperados or recuperados[0][1] < 2.8:
         return ConsultaRAGResponse(
             pregunta=pregunta,
@@ -314,7 +316,7 @@ def responder_con_rag(
                 url=c.get("url")
             ))
 
-    # 4. Síntesis fundamentada con Citas Obligatorias
+    # 4. Presentación determinista de extractos y citas.
     respuesta_texto = _sintetizar_respuesta_con_citas(pregunta, chunks, citas)
 
     return ConsultaRAGResponse(
@@ -334,8 +336,7 @@ def _sintetizar_respuesta_con_citas(
     citas: List[CitaNormativa]
 ) -> str:
     """
-    Sintetiza la respuesta redactada incorporando obligatoriamente las citas legales.
-    Aplica síntesis determinista directa si no hay conexión a internet o ante respuestas rápidas.
+    Presenta fragmentos y citas de forma determinista; no genera una interpretación jurídica.
     """
     citas_str = ", ".join([c.cita_oficial for c in citas])
     resumen_fragmentos = "\n\n".join([f"• {c['cita_oficial']}:\n{c['contenido'][:320].strip()}..." for c in chunks[:2]])

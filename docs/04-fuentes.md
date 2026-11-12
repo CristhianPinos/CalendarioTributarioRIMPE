@@ -6,7 +6,7 @@
 | **Proyecto** | Calendario Tributario Inteligente para Emprendedores RIMPE (Caso 11) |
 | **Fase / Semana** | Fase 1 – Semana 1 |
 | **Ubicación de Fuentes Crudas** | `data/raw/` (rutas relativas al repositorio) |
-| **Integridad Documental** | 100% Documentos Oficiales Íntegros en Formato PDF Original |
+| **Integridad Documental** | Siete PDF locales; la extracción textual y su vigencia requieren revisión |
 | **Fecha de Actualización** | Octubre 2026 |
 | **Versión** | 3.0.0 (Cuerpos normativos íntegros en PDF original) |
 
@@ -14,9 +14,9 @@
 
 ## 1. Inventario Formal de Fuentes Oficiales Íntegras
 
-La base de conocimiento de la aplicación está sustentada **exclusivamente en documentos jurídicos y resoluciones oficiales originales e íntegras** emitidas por el Servicio de Rentas Internas (**SRI**), la Presidencia de la República y la Asamblea Nacional del Ecuador.
+La base de conocimiento se construye a partir de siete PDF normativos locales atribuidos al Servicio de Rentas Internas (**SRI**), la Presidencia de la República y la Asamblea Nacional del Ecuador. La procedencia, integridad y vigencia deben verificarse frente a sus publicaciones oficiales antes de usar una cita para asesoría tributaria.
 
-Todos los documentos descargados se encuentran archivados en la carpeta relativa `data/raw/`, garantizando portabilidad multiplataforma e integridad probatoria:
+Los documentos fuente se encuentran en la carpeta relativa `data/raw/`. Su presencia facilita reproducir la ingesta, pero no constituye por sí sola prueba de integridad jurídica:
 
 | ID | Documento Oficial | Emisor Oficial | Enlace Web de Origen Oficial | Vigencia | Archivo Local Relativo | Extensión y Páginas | Tamaño |
 | :---: | :--- | :--- | :--- | :---: | :--- | :---: | :---: |
@@ -32,48 +32,42 @@ Todos los documentos descargados se encuentran archivados en la carpeta relativa
 
 ## 2. Estrategia de Fragmentación e Ingesta RAG (*Chunking Strategy*)
 
-Al contar con los **cuerpos documentales íntegros en PDF original**, el motor de indexación RAG procesa los documentos garantizando fidelidad semántica:
+La implementación actual extrae texto con PyPDF2, normaliza saltos y divide por cabeceras de artículos. En las resoluciones separa los considerandos y las disposiciones para evitar que una mención de otra norma parezca un artículo propio. La extracción de PDF puede perder tablas o mezclar encabezados; el resultado requiere auditoría.
 
 ```mermaid
 flowchart TD
-    PDFs["7 Documentos PDF Oficiales Íntegros en data/raw/"] --> Extractor["Extractor Estructurado PDF con PyPDF2 / PyMuPDF<br>(Extracción limpia por página y encabezado)"]
-    Extractor --> Normalizer["Filtro de Ruido (pies de página repetitivos, números de página)"]
-    
-    Normalizer --> Splitter{"Estrategia de Fragmentación"}
-    Splitter -- "Artículos Legales de Leyes y Resoluciones" --> ChunkArt["Chunking Estructural por Artículo<br>(400 - 700 tokens, 80 tokens overlap)"]
-    Splitter -- "Tablas Numéricas y Fechas (Res. 34, Ley 461)" --> ChunkTable["Chunking de Tablas Íntegras<br>(Preservación de filas con encabezados de columna)"]
-    
-    ChunkArt --> Metadata["Enriquecimiento con Metadatos"]
-    ChunkTable --> Metadata
-    
-    Metadata --> Embedder["Generación de Vectores (text-embedding-004)"]
-    Embedder --> Chroma["Base de Datos Vectorial (ChromaDB)"]
+    PDFs["Siete PDF en data/raw/"] --> Extractor["PyPDF2: texto extraído"]
+    Extractor --> Normalizer["Normalización de texto"]
+    Normalizer --> Splitter["Corte por artículo y disposiciones"]
+    Splitter --> JSON["rag_chunks.json con metadatos"]
+    JSON --> Filtro["Filtro de cabecera, vigencia, año y régimen"]
+    Filtro --> BM25["Ranking léxico BM25"]
+    BM25 --> Citas["Fragmentos y citas estructuradas"]
 ```
 
 ### 2.1. Parámetros Técnicos de Fragmentación:
-* **Segmentación por Artículo:** Delimitadores regex `r"(?i)(Artículo|Art\.)\s+\d+(\.\d+)?"` para mantener artículos normativos autocontenidos.
-* **Tamaño de chunk:** **400 a 700 tokens** (aprox. 1.600 a 2.800 caracteres).
-* **Solapamiento (*Overlap*):** **80 tokens** (aprox. 320 caracteres) para asegurar que las excepciones o literales no pierdan la referencia al encabezado del artículo.
-* **Preservación de tablas:** Las tablas de tarifas de la Ley de Eficiencia Económica (art. 23) y la tabla del noveno dígito de la Resolución 34 (art. 1) se indexan en fragmentos indivisibles con metadatos especiales `content_type: "tax_table"`.
+* **Segmentación:** cabeceras de artículos y disposiciones mediante expresiones regulares; los artículos extensos se subdividen por párrafos, con un prefijo que conserva el identificador.
+* **Umbral:** 2.400 caracteres por artículo antes de subdividir; objetivo de bloques cercano a 1.800 caracteres. No hay un solapamiento fijo de 80 tokens.
+* **Resoluciones:** el texto anterior a `RESUELVE:` no recibe una cita de artículo de la resolución; las disposiciones llevan su propia cabecera.
+* **Tablas:** no existe un extractor especializado de tablas ni metadato `content_type: tax_table`. Fechas y tarifas se calculan en Python desde `config/`; no deben deducirse de una tabla extraída de forma incompleta por el RAG.
 
 ---
 
 ## 3. Esquema de Metadatos para Filtrado Híbrido
 
-Cada fragmento almacenado en la colección vectorial contendrá el siguiente esquema JSON de metadatos:
+Cada fragmento de `data/processed/rag_chunks.json` contiene campos como los siguientes:
 
 ```json
 {
-  "chunk_id": "F03-ART-023",
-  "source_doc": "data/raw/03_ley_organica_eficiencia_economica_registro_oficial_461.pdf",
-  "document_title": "Ley Organica de Eficiencia Economica y Generacion de Empleo",
-  "authority": "Asamblea Nacional del Ecuador",
-  "legal_hierarchy": "Ley Organica",
-  "target_regime": ["RIMPE_NEGOCIO_POPULAR", "RIMPE_EMPRENDEDOR"],
-  "topic": "tabla_tarifas_cuotas_rimpe",
-  "page_number": 18,
-  "status": "vigente"
+  "chunk_id": "05_ley_regimen_tributario_interno_lrti.pdf_chunk_0258",
+  "documento": "Ley de Régimen Tributario Interno (LRTI)",
+  "articulo_seccion": "Art. 97.6",
+  "cita_oficial": "[Ley de Régimen Tributario Interno (LRTI), Art. 97.6]",
+  "regimen": "AMBOS",
+  "vigente": true,
+  "anio_fiscal": 2026,
+  "cabecera_verificable": true
 }
 ```
 
-Este esquema asegura que ante una consulta de un usuario, el agente puede recuperar la evidencia normativa exacta filtrando por régimen y citar con precisión la fuente, el artículo y el número de página del documento oficial.
+El índice también guarda `contenido`, `jerarquia`, `url` y `longitud_caracteres`. No guarda el número de página. Una cita estructurada indica de qué fragmento procede el extracto, pero no confirma que el artículo sea suficiente o pertinente para contestar la pregunta. La auditoría local y sus fallos se documentan en [la evaluación](07-evaluacion.md#9-auditoría-local-del-rag-posterior-a-la-revisión-de-fuentes).

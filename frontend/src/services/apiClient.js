@@ -50,8 +50,8 @@ const MOCK_CALENDARIO_EMPRENDEDOR = {
       id: "evt-renta-emp-2026",
       codigo_obligacion: "RENTA_ANUAL_EMPRENDEDOR",
       titulo: "Declaración Anual de Impuesto a la Renta (Ejercicio Fiscal 2026)",
-      fecha_vencimiento: "2027-03-24",
-      fecha_nominal: "2027-03-24",
+      fecha_vencimiento: "2027-05-25",
+      fecha_nominal: "2027-05-24",
       fue_trasladada: false,
       motivo_traslado: "Día hábil regular",
       categoria: "RIMPE",
@@ -108,6 +108,12 @@ async function apiRequest(endpoint, options = {}) {
       errorObj.status = response.status;
       errorObj.data = data;
       errorObj.latencyMs = latencyHeader;
+      if (response.status === 429) {
+        const retryAfter = Number(response.headers.get("retry-after"));
+        if (Number.isFinite(retryAfter) && retryAfter > 0) {
+          errorObj.retryAfterSeconds = retryAfter;
+        }
+      }
       throw errorObj;
     }
 
@@ -149,37 +155,32 @@ export async function calcularCalendario(perfilData) {
 
 /**
  * Obtiene la explicación pedagógica generada con IA (Google Gemini Flash) o catálogo de contingencia.
- * @param {Object} payload { codigo_obligacion, tipo_regimen, fecha_vencimiento, noveno_digito, ruc, es_declaracion_en_cero }
+ * @param {Object} payload { codigo_obligacion, tipo_regimen, fecha_vencimiento, es_declaracion_en_cero }
  */
-export async function obtenerExplicacion(payload) {
+export async function obtenerExplicacion(payload, { signal } = {}) {
   if (USE_MOCKS) {
     await new Promise((r) => setTimeout(r, 600));
     const enCero = Boolean(payload.es_declaracion_en_cero);
     return {
       data: {
-        recordatorio: {
+        obligacion: {
           codigo_obligacion: payload.codigo_obligacion,
           titulo_pedagogico: enCero
             ? `[DECLARACIÓN EN CEROS] ${payload.codigo_obligacion}`
             : "Tu Declaración Tributaria RIMPE",
-          resumen_didactico: enCero
-            ? "ATENCIÓN - DECLARACIÓN EN CERO: Aunque no registraste ventas ni compras durante este período, el SRI exige presentar de forma 100% obligatoria la declaración informativa con valores en cero ($0.00). Omitir esta declaración genera multas automáticas inmediatas."
+          explicacion_sencilla: enCero
+            ? "Revisa las obligaciones de tu RUC y la información precargada antes de declarar sin movimiento."
             : "Como contribuyente del régimen RIMPE debes presentar la declaración del período acumulado conforme a la normativa oficial.",
           formulario_sri: "Formulario en línea (portal del SRI)",
-          comprobantes_validos: enCero
-            ? "No se requieren facturas de ventas. En el formulario marca 'NO' a registrar información."
-            : "Facturas electrónicas autorizadas y comprobantes de retención recibidos.",
-          advertencia_en_cero:
-            "La presentación en ceros es obligatoria. No presentarla dentro del plazo genera una sanción pecuniaria de $30 a $60 USD según el Art. 100 de la LRTI.",
+          comprobantes_validos: "Revisa los comprobantes de venta, adquisición y retención que correspondan al período.",
           base_legal_oficial: "LRTI Art. 97.6, 97.8 y Resoluciones SRI NAC-DGERCGC24-00000027 / NAC-23-0034.",
           sugerencia_accion: enCero
-            ? "1. Accede a SRI en Línea > Declaraciones. 2. En la pregunta inicial selecciona 'NO'. 3. Confirma que los casilleros queden en $0.00 y pulsa 'Firmar y Enviar'."
+            ? "Accede a SRI en Línea, revisa los datos precargados y, si corresponde, declara sin movimiento tras verificar el formulario."
             : "Revisa tus facturas emitidas y recibidas al menos 5 días antes de la fecha límite.",
           canal_recomendado: "Portal SRI en Línea (www.sri.gob.ec) > Declaraciones.",
         },
-        fuente: "GEMINI_FLASH",
-        modelo: "gemini-3.8-flash",
-        tiempo_generacion_segundos: 0.85,
+        modelo_utilizado: "mock-local",
+        tiempo_generacion_ms: 850,
       },
     };
   }
@@ -187,34 +188,20 @@ export async function obtenerExplicacion(payload) {
   return await apiRequest("/api/obligaciones/explicar", {
     method: "POST",
     body: JSON.stringify(payload),
+    signal,
   });
 }
 
 /**
  * Simula la cuota o impuesto causado de Impuesto a la Renta según la Ley de Eficiencia Económica.
- * @param {Object} payload { ingresos_brutos_anuales, tipo_regimen }
+ * @param {Object} payload { ingresos_brutos, tipo_regimen }
+ * La cuota se consulta siempre a Python; no existe cálculo tributario mock en el frontend.
  */
 export async function simularCuotaRenta(payload) {
-  if (USE_MOCKS) {
-    await new Promise((r) => setTimeout(r, 200));
-    const ingresos = parseFloat(payload.ingresos_brutos_anuales) || 0;
-    return {
-      data: {
-        ingresos_brutos_anuales: ingresos,
-        tipo_regimen: payload.tipo_regimen,
-        cuota_estimada_usd: ingresos <= 20000 ? 60.0 : 60.0 + (ingresos - 20000) * 0.01,
-        detalle_calculo: "Cálculo simulado basado en el Art. 23 de la Ley de Eficiencia Económica.",
-        alerta_transicion: ingresos > 20000 && payload.tipo_regimen === "RIMPE_NEGOCIO_POPULAR"
-          ? "Tus ingresos superan el límite de $20,000 USD de Negocio Popular."
-          : null,
-      },
-    };
-  }
-
   return await apiRequest("/api/simulador/renta", {
     method: "POST",
     body: JSON.stringify({
-      ingresos_brutos: parseFloat(payload.ingresos_brutos ?? payload.ingresos_brutos_anuales) || 0.0,
+      ingresos_brutos: payload.ingresos_brutos,
       tipo_regimen: payload.tipo_regimen,
     }),
   });
@@ -270,7 +257,6 @@ export async function ejecutarAgente({
   perfil,
   base_imponible_iva = null,
   confirmacion_envio = false,
-  operatorCredentials = null,
 }) {
   if (USE_MOCKS) {
     await new Promise((r) => setTimeout(r, 500));
@@ -291,11 +277,6 @@ export async function ejecutarAgente({
 
   return await apiRequest("/api/agente/ejecutar", {
     method: "POST",
-    headers: operatorCredentials
-      ? {
-          Authorization: `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${operatorCredentials.username}:${operatorCredentials.password}`)))}`,
-        }
-      : {},
     body: JSON.stringify({
       instruccion,
       perfil,
@@ -305,13 +286,16 @@ export async function ejecutarAgente({
   });
 }
 
-/** Registra un perfil para el escaneo diario con autorización explícita del operador. */
-export async function guardarPerfilRegistrado(perfilData, operatorCredentials) {
-  const credentials = `${operatorCredentials.username}:${operatorCredentials.password}`;
-  const authorization = btoa(String.fromCharCode(...new TextEncoder().encode(credentials)));
-  return await apiRequest("/api/perfiles", {
+export async function solicitarCodigoCorreo(email) {
+  return await apiRequest("/api/correo/solicitar-codigo", {
     method: "POST",
-    headers: { Authorization: `Basic ${authorization}` },
-    body: JSON.stringify(perfilData),
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function enviarRecordatorioVerificado({ email, codigo, perfil, anio, codigo_obligacion }) {
+  return await apiRequest("/api/correo/enviar-recordatorio", {
+    method: "POST",
+    body: JSON.stringify({ email, codigo, perfil, anio, codigo_obligacion, confirmacion_envio: true }),
   });
 }

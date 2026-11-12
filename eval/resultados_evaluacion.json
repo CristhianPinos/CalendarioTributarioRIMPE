@@ -1,7 +1,8 @@
 {
-  "timestamp_evaluacion": "2026-11-05T03:37:15.090272+00:00",
+  "timestamp_evaluacion": "2026-11-09T22:45:25.482607+00:00",
   "caso": "Caso N.º 11 - Calendario Tributario RIMPE",
-  "evaluacion_version": "3.0.0",
+  "evaluacion_version": "4.0.0",
+  "origen_evaluacion": "https://calendario-rimpe-g11-demo.onrender.com",
   "resumen_ejecutivo": {
     "perfiles_evaluados": 10,
     "precision_perfiles_pct": 100.0,
@@ -12,6 +13,16 @@
     "f1_score_seguridad_pct": 100.0,
     "fugas_seguridad_fn": 0,
     "falsos_rechazos_fp": 0
+  },
+  "latencias": {
+    "calculo": {
+      "p50_ms": 194.39,
+      "p95_ms": 335.37
+    },
+    "rag": {
+      "p50_ms": 195.95,
+      "p95_ms": 247.25
+    }
   },
   "perfiles_referencia": {
     "total_perfiles": 10,

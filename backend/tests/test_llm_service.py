@@ -40,6 +40,11 @@ class TestFallbackDeterminista:
         plantilla = FALLBACK_OBLIGACIONES[codigo]
         assert "LRTI" in plantilla["base_legal_oficial"] or "Ley" in plantilla["base_legal_oficial"]
         assert len(plantilla["explicacion_sencilla"]) > 50
+        rec = obtener_fallback_determinista(codigo, "2026-07-20", TipoRegimen.RIMPE_EMPRENDEDOR)
+        assert rec.explicacion_sencilla.strip()
+        assert rec.comprobantes_validos.strip()
+        assert rec.base_legal_oficial.strip()
+        assert rec.sugerencia_accion.strip()
 
     def test_obtener_fallback_retorna_recordatorio_valido(self):
         rec = obtener_fallback_determinista(
@@ -51,6 +56,20 @@ class TestFallbackDeterminista:
         assert rec.codigo_obligacion == "IVA_SEMESTRAL_1"
         assert "2026-07-20" in rec.fecha_limite_formateada
         assert "Formulario 104" in rec.sugerencia_accion or "Formulario 104" in rec.canal_recomendado
+        assert "comprobantes" in rec.comprobantes_validos.lower()
+        assert "LRTI" in rec.base_legal_oficial
+
+    def test_modo_en_cero_solo_modifica_iva_semestral(self):
+        iva = obtener_fallback_determinista(
+            "IVA_SEMESTRAL_1", "2026-07-20", TipoRegimen.RIMPE_EMPRENDEDOR, True
+        )
+        renta = obtener_fallback_determinista(
+            "RENTA_ANUAL_NEGOCIO_POPULAR", "2027-05-25", TipoRegimen.RIMPE_NEGOCIO_POPULAR, True
+        )
+        assert "DECLARACIÓN EN CEROS" in iva.titulo_pedagogico
+        assert "información precargada" in iva.explicacion_sencilla
+        assert "$30" not in iva.consecuencia_incumplimiento
+        assert "DECLARACIÓN EN CEROS" not in renta.titulo_pedagogico
 
     def test_servicio_usa_fallback_si_no_hay_api_key(self):
         req = ExplicacionObligacionRequest(
@@ -133,6 +152,8 @@ class TestTenacityResilience:
         assert resp.modelo_utilizado != "fallback-determinista-sri"
         assert resp.tokens_utilizados == 240
         assert resp.obligacion.titulo_pedagogico == "Declaración IVA Semestre 1"
+        assert resp.obligacion.comprobantes_validos
+        assert resp.obligacion.base_legal_oficial == "LRTI, art. 97.8; Reglamento a la LRTI, arts. 224 y 225."
 
 
 class TestInvocacionExitosa:
@@ -176,3 +197,25 @@ class TestInvocacionExitosa:
         assert resp.tokens_utilizados == 512
         assert resp.tiempo_generacion_ms > 0
         assert isinstance(resp.obligacion, RecordatorioEstructurado)
+        assert resp.obligacion.comprobantes_validos
+
+    @patch("backend.services.llm._invocar_gemini_raw")
+    def test_codigo_incorrecto_de_gemini_activa_contingencia(self, mock_gemini):
+        mock_gemini.return_value = ({
+            "codigo_obligacion": "RENTA_ANUAL_EMPRENDEDOR",
+            "titulo_pedagogico": "Otra obligación",
+            "fecha_limite_formateada": "2026-07-20",
+            "base_legal_oficial": "LRTI",
+            "explicacion_sencilla": "Texto",
+            "consecuencia_incumplimiento": "Texto",
+            "sugerencia_accion": "Texto",
+            "canal_recomendado": "SRI",
+        }, 1)
+        req = ExplicacionObligacionRequest(
+            codigo_obligacion="IVA_SEMESTRAL_1",
+            tipo_regimen=TipoRegimen.RIMPE_EMPRENDEDOR,
+            fecha_vencimiento="2026-07-20",
+        )
+        resp = generar_explicacion_obligacion(request=req, api_key="test-key")
+        assert resp.modelo_utilizado == "fallback-determinista-sri"
+        assert resp.obligacion.codigo_obligacion == req.codigo_obligacion

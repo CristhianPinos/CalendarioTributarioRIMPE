@@ -5,6 +5,7 @@ efectuando prórrogas automáticas por fines de semana y feriados nacionales ofi
 """
 
 import json
+import math
 import os
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -190,8 +191,9 @@ def calcular_vencimientos(
             "descripcion": "Declaración del segundo semestre de IVA ante el SRI para RIMPE Emprendedor."
         })
 
-        # 3. Impuesto a la Renta Anual Emprendedor (Personas Naturales): Vence en Marzo del año fiscal siguiente
-        fecha_nominal_renta = date(anio + 1, 3, dia_base)
+        # Emprendedor persona natural: mayo del año siguiente (Res. NAC-DGERCGC24-00000027, art. 8).
+        mes_renta_emprendedor = reglas["meses_declaracion"]["renta_rimpe_emprendedor_natural"]
+        fecha_nominal_renta = date(anio + 1, mes_renta_emprendedor, dia_base)
         fecha_ajustada_renta, fue_trasladada_renta, motivo_renta = trasladar_al_siguiente_dia_habil(
             fecha_nominal_renta, feriados
         )
@@ -277,33 +279,39 @@ def simular_cuota_renta(ingresos_brutos: float, tipo_regimen: str, config_path: 
     tabla oficial de la Ley Orgánica de Eficiencia Económica y Generación de Empleo (Art. 23).
     Utiliza Decimal con cuantización a 2 decimales (ROUND_HALF_UP) y evaluación continua de tramos.
     """
+    if not math.isfinite(ingresos_brutos):
+        raise ValueError("Los ingresos brutos deben ser un número finito.")
     if ingresos_brutos < 0:
         raise ValueError("Los ingresos brutos no pueden ser negativos.")
 
     reglas = cargar_reglas_sri(config_path)
     dos_decimales = Decimal("0.01")
     d_ingresos = Decimal(str(ingresos_brutos))
+    if d_ingresos.as_tuple().exponent < -2:
+        raise ValueError("Los ingresos brutos admiten como máximo dos decimales.")
+    tabla_cuotas = reglas.get("tabla_negocio_popular_renta", [])
+    tabla_emprendedor = reglas.get("tabla_emprendedor_renta", [])
+    if not tabla_cuotas or not tabla_emprendedor:
+        raise ValueError("Faltan tablas RIMPE para calcular la cuota.")
+    limite_negocio_popular = Decimal(str(tabla_cuotas[-1]["limite_superior"]))
+    limite_rimpe = Decimal(str(tabla_emprendedor[-1]["limite_superior"]))
 
-    if tipo_regimen == "RIMPE_NEGOCIO_POPULAR":
-        if d_ingresos > Decimal("20000.00"):
-            return {
-                "tipo_regimen": tipo_regimen,
-                "ingresos_brutos": float(d_ingresos),
-                "impuesto_causado": 60.00,
-                "alerta_transicion": (
-                    "Tus ingresos superan los $20.000,00 USD. Para el siguiente ejercicio fiscal "
-                    "pasarás automáticamente a RIMPE Emprendedor."
-                )
-            }
+    if tipo_regimen not in ("RIMPE_NEGOCIO_POPULAR", "RIMPE_EMPRENDEDOR"):
+        raise ValueError(f"No se pudo calcular la cuota para los ingresos {ingresos_brutos} y régimen {tipo_regimen}")
+    if d_ingresos > limite_rimpe:
+        raise ValueError(
+            "Los ingresos superan el límite máximo de $300.000,00 USD para RIMPE. Corresponde al Régimen General."
+        )
 
-        tabla = reglas.get("tabla_negocio_popular_renta", [])
-        for i, tramo in enumerate(tabla):
+    # Art. 97.6 LRTI: ambas categorías usan la tabla de cuotas hasta USD 20.000.
+    if d_ingresos <= limite_negocio_popular:
+        for i, tramo in enumerate(tabla_cuotas):
             lim_inf = Decimal(str(tramo["limite_inferior"]))
             lim_sup = Decimal(str(tramo["limite_superior"]))
             cuota = Decimal(str(tramo["cuota_fija_usd"])).quantize(dos_decimales, rounding=ROUND_HALF_UP)
 
             # Continuidad sin huecos: tramo 0 incluye el 0; los demás evalúan por encima del límite inferior previo
-            aplica = (lim_inf <= d_ingresos <= lim_sup) if i == 0 else (lim_inf - Decimal("0.01") < d_ingresos <= lim_sup)
+            aplica = (lim_inf <= d_ingresos <= lim_sup) if i == 0 else (lim_inf - dos_decimales < d_ingresos <= lim_sup)
 
             if aplica:
                 return {
@@ -314,30 +322,23 @@ def simular_cuota_renta(ingresos_brutos: float, tipo_regimen: str, config_path: 
                     "tramo_aplicado": f"${tramo['limite_inferior']} - ${tramo['limite_superior']}"
                 }
 
-    elif tipo_regimen == "RIMPE_EMPRENDEDOR":
-        if d_ingresos > Decimal("300000.00"):
-            raise ValueError(
-                "Los ingresos superan el límite máximo de $300.000,00 USD para RIMPE. Corresponde al Régimen General."
-            )
-        if Decimal("0.0") <= d_ingresos <= Decimal("20000.00"):
-            return {
-                "tipo_regimen": tipo_regimen,
-                "ingresos_brutos": float(d_ingresos),
-                "fraccion_basica": 60.00,
-                "tipo_marginal": "0.0%",
-                "impuesto_causado": 60.00,
-                "nota": "Ingresos dentro del rango inicial de hasta $20.000,00 USD."
-            }
+    # Un Negocio Popular que supera USD 20.000 liquida con la tabla de Emprendedor.
+    alerta_transicion = None
+    if tipo_regimen == "RIMPE_NEGOCIO_POPULAR":
+        alerta_transicion = (
+            "Los ingresos superan el límite de Negocio Popular. Se aplicó la tabla de Emprendedor "
+            "para esta simulación; verifica tu categoría registrada en el SRI."
+        )
 
-        tabla = reglas.get("tabla_emprendedor_renta", [])
-        for i, tramo in enumerate(tabla):
+    if d_ingresos > limite_negocio_popular:
+        for i, tramo in enumerate(tabla_emprendedor):
             lim_inf = Decimal(str(tramo["limite_inferior"]))
             lim_sup = Decimal(str(tramo["limite_superior"]))
             f_basica = Decimal(str(tramo["impuesto_fraccion_basica"]))
             t_marginal = Decimal(str(tramo["tipo_marginal_porcentaje"])) / Decimal("100.0")
 
             # Continuidad sin huecos entre tramos consecutivos
-            aplica = (lim_inf - Decimal("0.01") < d_ingresos <= lim_sup)
+            aplica = (lim_inf - dos_decimales < d_ingresos <= lim_sup)
 
             if aplica:
                 excedente = d_ingresos - lim_inf
@@ -351,7 +352,8 @@ def simular_cuota_renta(ingresos_brutos: float, tipo_regimen: str, config_path: 
                     "fraccion_basica": float(f_basica),
                     "tipo_marginal": f"{tramo['tipo_marginal_porcentaje']}%",
                     "impuesto_causado": float(impuesto_total),
-                    "tramo_aplicado": f"${tramo['limite_inferior']} - ${tramo['limite_superior']}"
+                    "tramo_aplicado": f"${tramo['limite_inferior']} - ${tramo['limite_superior']}",
+                    "alerta_transicion": alerta_transicion,
                 }
 
     raise ValueError(f"No se pudo calcular la cuota para los ingresos {ingresos_brutos} y régimen {tipo_regimen}")

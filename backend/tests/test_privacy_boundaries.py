@@ -36,15 +36,14 @@ def test_agent_trace_hides_identity_and_message_body():
     assert protected["monto_iva"] == 15.0
 
 
-def test_smtp_exception_never_logs_personal_data(monkeypatch, caplog):
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("SMTP_USER", "operador@example.com")
-    monkeypatch.setenv("SMTP_PASSWORD", "clave-de-prueba")
+def test_mailjet_exception_never_logs_personal_data(monkeypatch, caplog):
+    from backend.services.mailjet_service import MailjetError
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.configurado", lambda: True)
 
     def fail_connect(*args, **kwargs):
-        raise ConnectionError(f"Falló {EMAIL} RUC {RUC}")
+        raise MailjetError(f"Falló {EMAIL} RUC {RUC}")
 
-    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", fail_connect)
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.enviar_correo", fail_connect)
     result = tool_enviar_recordatorio(EnviarRecordatorioInput(
         destinatario=EMAIL, asunto="Recordatorio tributario",
         texto=f"Texto privado del contribuyente {RUC}", confirmacion_usuario=True,

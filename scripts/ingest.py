@@ -32,7 +32,7 @@ FUENTES_CATALOGO = [
         "documento": "Resolución SRI NAC-DGERCGC24-00000027",
         "descripcion": "Normas para la aplicación del régimen RIMPE y deberes formales",
         "jerarquia": "resolucion_sri",
-        "url": "https://www.sri.gob.ec/normativa-tributaria",
+        "url": "https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar?id=7c3fb8dc-31a6-4fe3-a6c0-abe1def2c78a&nombre=NAC-DGERCGC24-00000027.pdf",
         "vigente": True,
         "anio_fiscal": 2026,
         "regimen_defecto": "AMBOS",
@@ -43,7 +43,7 @@ FUENTES_CATALOGO = [
         "documento": "Resolución SRI NAC-DGERCGC23-00000034",
         "descripcion": "Calendario de declaraciones periódicas por noveno dígito del RUC",
         "jerarquia": "resolucion_sri",
-        "url": "https://www.sri.gob.ec/calendario-tributario",
+        "url": "https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/680d53fa-89af-4dbf-9715-b82d7555279e/NAC-DGERCGC23-00000034.pdf",
         "vigente": True,
         "anio_fiscal": 2026,
         "regimen_defecto": "AMBOS",
@@ -76,7 +76,7 @@ FUENTES_CATALOGO = [
         "documento": "Ley de Régimen Tributario Interno (LRTI)",
         "descripcion": "Régimen RIMPE, base legal, deberes formales, exclusiones y cuotas (Arts. 97.1 a 97.10)",
         "jerarquia": "ley_ordinaria",
-        "url": "https://www.sri.gob.ec/normativa-tributaria",
+        "url": "https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/68811e77-7b9c-4061-a2b4-c6a99696b00e/LEY_DE_REGIMEN_TRIBUTARIO_INTERNO_LRTI.pdf",
         "vigente": True,
         "anio_fiscal": 2026,
         "regimen_defecto": "AMBOS",
@@ -87,7 +87,7 @@ FUENTES_CATALOGO = [
         "documento": "Código Tributario del Ecuador",
         "descripcion": "Normas fundamentales, plazos tributarios y traslados por días inhábiles (Art. 12)",
         "jerarquia": "codigo_organico",
-        "url": "https://www.registroficial.gob.ec",
+        "url": "https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/ecfc5e70-e0cf-4f52-b2ba-8c4fc8035f68/Codigo_Tributario_20_junio_2023.pdf",
         "vigente": True,
         "anio_fiscal": 2026,
         "regimen_defecto": "GENERAL",
@@ -212,7 +212,8 @@ def fragmentar_por_articulos_o_secciones(texto: str, metadata_base: Dict[str, An
             match_interior = re.search(r"\bArt[^\n\r\.\d]{0,6}(?:\.|\s*culo)?\s*(\d+(?:\.\d+)?)", primeras_lineas, re.IGNORECASE)
             if match_interior:
                 cita_especifica = f"Art. {match_interior.group(1)}"
-                tiene_cabecera = True
+                # Una mención dentro del texto no es la cabecera del artículo citado.
+                tiene_cabecera = False
             else:
                 cita_especifica = f"Sección {i+1}"
                 tiene_cabecera = False
@@ -241,7 +242,7 @@ def fragmentar_por_articulos_o_secciones(texto: str, metadata_base: Dict[str, An
                             "jerarquia": metadata_base["jerarquia"],
                             "url": metadata_base["url"],
                             "longitud_caracteres": len(acumulado.strip()),
-                            "cabecera_verificable": True
+                            "cabecera_verificable": tiene_cabecera
                         })
                         sub_idx += 1
                     acumulado = sp
@@ -258,7 +259,7 @@ def fragmentar_por_articulos_o_secciones(texto: str, metadata_base: Dict[str, An
                     "jerarquia": metadata_base["jerarquia"],
                     "url": metadata_base["url"],
                     "longitud_caracteres": len(acumulado.strip()),
-                    "cabecera_verificable": True
+                    "cabecera_verificable": tiene_cabecera
                 })
         else:
             chunks.append({
@@ -276,6 +277,53 @@ def fragmentar_por_articulos_o_secciones(texto: str, metadata_base: Dict[str, An
                 "cabecera_verificable": tiene_cabecera
             })
 
+    return chunks
+
+
+def fragmentar_resolucion_operativa(texto: str, metadata_base: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Separa considerandos, artículos y disposiciones para no atribuir citas ajenas a la resolución."""
+    resuelve = re.search(r"\bRESUELVE\s*:", texto, re.IGNORECASE)
+    if not resuelve:
+        return fragmentar_por_articulos_o_secciones(texto, metadata_base)
+    cuerpo = texto[resuelve.end():]
+    primer_articulo = re.search(r"(?mi)^\s*Art(?:ículo|iculo|\.)\s*1\b", cuerpo)
+    if not primer_articulo:
+        return fragmentar_por_articulos_o_secciones(texto, metadata_base)
+    cuerpo = cuerpo[primer_articulo.start():]
+    patron_disposicion = re.compile(
+        r"(?mi)^\s*DISPOSICI(?:ÓN|ON)(?:ES)?\s+"
+        r"(?:GENERALES|GENERAL|DEROGATORIA|FINAL|TRANSITORIAS)\b"
+    )
+    disposiciones = list(patron_disposicion.finditer(cuerpo))
+    articulos = cuerpo[:disposiciones[0].start()] if disposiciones else cuerpo
+    chunks = fragmentar_por_articulos_o_secciones(articulos, metadata_base)
+
+    if disposiciones:
+        cola = cuerpo[disposiciones[0].start():]
+        firma = re.search(r"(?mi)^\s*(?:Dictó y firmó|Publíquese y cúmplase)", cola)
+        if firma:
+            cola = cola[:firma.start()]
+        secciones = list(patron_disposicion.finditer(cola))
+        for idx, match in enumerate(secciones):
+            fin = secciones[idx + 1].start() if idx + 1 < len(secciones) else len(cola)
+            contenido = cola[match.start():fin].strip()
+            if len(contenido) < 40:
+                continue
+            seccion = " ".join(match.group().split()).capitalize()
+            chunks.append({
+                "chunk_id": f"{metadata_base['archivo']}_chunk_{len(chunks)+1:04d}",
+                "documento": metadata_base["documento"],
+                "articulo_seccion": seccion,
+                "cita_oficial": f"[{metadata_base['documento']}, {seccion}]",
+                "contenido": contenido,
+                "regimen": inferir_regimen(contenido),
+                "vigente": metadata_base["vigente"],
+                "anio_fiscal": metadata_base["anio_fiscal"],
+                "jerarquia": metadata_base["jerarquia"],
+                "url": metadata_base["url"],
+                "longitud_caracteres": len(contenido),
+                "cabecera_verificable": True,
+            })
     return chunks
 
 
@@ -302,7 +350,11 @@ def ejecutar_pipeline_ingesta(generar_embeddings: bool = False) -> Dict[str, Any
         texto_crudo = extraer_texto_pdf(archivo_path)
         texto_limpio = normalizar_texto(texto_crudo)
 
-        chunks_doc = fragmentar_por_articulos_o_secciones(texto_limpio, fuente)
+        chunks_doc = (
+            fragmentar_resolucion_operativa(texto_limpio, fuente)
+            if fuente["jerarquia"] == "resolucion_sri"
+            else fragmentar_por_articulos_o_secciones(texto_limpio, fuente)
+        )
         todos_los_chunks.extend(chunks_doc)
 
         cabeceras = sum(1 for c in chunks_doc if c["cabecera_verificable"])

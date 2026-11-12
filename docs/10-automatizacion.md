@@ -1,17 +1,21 @@
 # Documento de Diseño: Flujo Automatizado y Programado (Semana 3)
 
+> **Estado al 11 de noviembre de 2026:** este documento describe el diseño histórico de la semana 3. Las rutas `/api/perfiles` y `/api/flujo` y el planificador no se montan en la aplicación pública actual. El flujo activo es el envío puntual con código temporal de correo y confirmación; no requiere operador ni guarda perfiles tributarios. Véase ADR-010 en `docs/09-decisiones.md`.
+
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE  
 **Módulo:** Automatización de Tareas Diarias y Notificaciones Programadas (`backend/services/scheduler.py`)  
 **Fecha:** Octubre / Noviembre 2026  
-**Estado:** Implementado, Probado e Integrado en API (`backend/routers/flujo_router.py`)  
+**Estado:** Diseño histórico implementado y probado; su router y el planificador no están montados en la aplicación actual.
 
-**Disparador diario:** `backend/services/periodic_scan.py` se inicia y detiene con FastAPI. Se habilita con `SCHEDULER_ENABLED=true` y usa `SCHEDULER_CRON_HOUR`, `SCHEDULER_CRON_MINUTE` y `TIMEZONE`. Permanece desactivado por defecto. Con `SCHEDULER_ALLOW_DEMO_PROFILES=false`, escanea exclusivamente perfiles persistidos con consentimiento; `true` permite probarlo expresamente con los perfiles de demostración. La ruta manual sigue disponible para el operador y usa el mismo criterio.
+**Disparador diario del diseño histórico:** `backend/services/periodic_scan.py` puede habilitarse en una instalación que vuelva a integrar el planificador y la persistencia, pero `backend/main.py` no lo inicia actualmente. Los parámetros `SCHEDULER_ENABLED`, `SCHEDULER_CRON_HOUR`, `SCHEDULER_CRON_MINUTE` y `TIMEZONE` no activan por sí solos este flujo en la aplicación actual. La ruta manual de `flujo_router.py` tampoco está montada.
 
 El disparador es interno a un proceso: habilitarlo en una sola instancia para evitar escaneos duplicados. SQLite impone unicidad de `RUC + obligación + fecha`; la confirmación reserva la fila atómicamente antes del SMTP. Tras un fallo se registra el tipo de error y se espera el siguiente horario; la ruta manual permite una recuperación supervisada. El planificador solo prepara elementos `PENDIENTE_CONFIRMACION` y no aprueba ni despacha correos.
 
 **Persistencia:** `backend/services/storage.py` abre SQLite de forma diferida en `RIMPE_DB_PATH` (por defecto `data/processed/rimpe.sqlite3`). En el primer acceso, importa una sola vez la cola JSON anterior, crea `recordatorios_pendientes.json.bak` y conserva el JSON original. La importación no crea perfiles ni consentimiento: esos recordatorios antiguos no se pueden despachar hasta que un operador registre un perfil con autorización para el mismo RUC y correo. Se recomienda respaldar la base con la API `SQLiteStore.backup_to()` y restaurarla con la aplicación detenida. La base y su respaldo contienen datos personales; deben almacenarse en un volumen privado con acceso restringido. El estado `EN_PROCESO` después de una interrupción se muestra en revisión y no puede reenviarse automáticamente.
 
-**Registro:** `POST /api/perfiles` crea o actualiza un perfil con autenticación de operador. El consentimiento `correo_notificaciones` está desactivado por defecto; volver a guardar el perfil con `false` lo revoca. `GET /api/perfiles` y `GET /api/perfiles/{ruc}` también exigen operador. El formulario permite este registro opcional; generar el calendario no guarda datos. Al confirmar cualquier envío se vuelve a comprobar el consentimiento vigente y que coincidan RUC y correo.
+**Registro del diseño histórico:** `perfiles_router.py` implementa alta y consulta de perfiles para una instalación persistente, pero esas rutas no están expuestas por la aplicación actual. El formulario público no ofrece registro y generar el calendario no guarda datos. La reactivación del registro y del escaneo requeriría volver a definir consentimiento, autorización y almacenamiento duradero.
+
+**Interfaz de despacho histórica:** La etapa 5 exigía autorización de operador y consentimiento persistido. ADR-010 sustituyó este flujo: el modal actual solicita un código temporal al correo elegido, exige confirmación explícita y despacha un recordatorio puntual sin registrar un perfil. ADR-011 sustituyó el transporte SMTP del flujo puntual por la API HTTPS de Mailjet.
 
 ---
 

@@ -25,31 +25,22 @@ from backend.routers.obligaciones_router import router as obligaciones_router
 from backend.routers.calendario_router import router as calendario_router
 from backend.routers.rag_router import router as rag_router
 from backend.routers.agente_router import router as agente_router
-from backend.routers.flujo_router import router as flujo_router
-from backend.routers.perfiles_router import router as perfiles_router
-from backend.services.periodic_scan import PeriodicScanRunner
+from backend.routers.correo_router import router as correo_router
 
 # El log de acceso por defecto incluye URLs aportadas por el cliente; el middleware
 # registra método, plantilla de ruta, estado y latencia sin identificadores.
 logging.getLogger("uvicorn.access").disabled = True
 
-APP_VERSION = "3.2.0"
+APP_VERSION = "3.3.0"
 PROJECT_NAME = "Calendario Tributario RIMPE"
-periodic_scan_runner = None
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inicia y detiene el escaneo periódico junto con la aplicación."""
-    global periodic_scan_runner
-    periodic_scan_runner = PeriodicScanRunner()
-    periodic_scan_runner.start()
-    try:
-        yield
-    finally:
-        periodic_scan_runner.stop()
+    """La versión pública no inicia procesos periódicos ni guarda perfiles."""
+    yield
 
 app = FastAPI(
     title="API Calendario Tributario RIMPE (SRI Ecuador)",
@@ -57,7 +48,7 @@ app = FastAPI(
         "Backend inteligente para el cálculo determinista de obligaciones tributarias, "
         "motor RAG con citas normativas obligatorias y política de abstención, "
         "agente con 4 herramientas tipadas y límite de iteraciones, "
-        "flujo programado diario con compuerta de confirmación humana (HITL), "
+        "envío puntual con correo verificado y confirmación humana (HITL), "
         "y observabilidad conforme a la Ley Orgánica de Protección de Datos Personales (LOPDP)."
     ),
     version=APP_VERSION,
@@ -99,8 +90,7 @@ app.include_router(calendario_router)
 app.include_router(obligaciones_router)
 app.include_router(rag_router)
 app.include_router(agente_router)
-app.include_router(flujo_router)
-app.include_router(perfiles_router)
+app.include_router(correo_router)
 
 if (FRONTEND_DIST / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="frontend-assets")
@@ -154,9 +144,9 @@ def health_check():
             "rag_chunks_available": Path("data/processed/rag_chunks.json").exists()
         },
         "periodic_scan": {
-            "enabled": periodic_scan_runner.enabled if periodic_scan_runner else False,
-            "last_run_at": periodic_scan_runner.last_run_at if periodic_scan_runner else None,
-            "last_result": periodic_scan_runner.last_result if periodic_scan_runner else None,
+            "enabled": False,
+            "last_run_at": None,
+            "last_result": None,
         },
         "timestamp": datetime.now(timezone.utc).isoformat()
     }

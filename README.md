@@ -2,11 +2,11 @@
 
 Aplicación académica del Caso 11, Grupo 11, UNIANDES. Genera un calendario para contribuyentes RIMPE de Ecuador, explica obligaciones con Gemini y documentos normativos, y prepara recordatorios sujetos a consentimiento y aprobación humana.
 
-**Estado de la fase 4:** imagen y configuración de despliegue preparadas; [pruebas HTTP locales](docs/08-pruebas-local.md) ejecutadas. **URL pública:** pendiente de publicación y verificación en Render. La demostración Free no guarda perfiles ni envía correos.
+**Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). Se verificó el despliegue del commit [`84cc378`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/84cc378bac8fc1322818c24451b54f78bde86e02), [18/18 pruebas HTTP](docs/08-pruebas.md) y la [evaluación comparada](docs/07-evaluacion.md#8-comparación-de-la-semana-4). Esta instancia es de solo lectura para perfiles y no ofrece recordatorios persistentes ni envíos SMTP.
 
 ## Problema y solución
 
-Los vencimientos dependen del noveno dígito del RUC, el régimen, el período y los días inhábiles. Una fecha incorrecta puede inducir a incumplimiento. El motor Python calcula fechas y montos a partir de [`config/`](config/). Gemini redacta explicaciones; el RAG aporta citas de los documentos procesados. Un operador autenticado revisa cada recordatorio antes de despacharlo.
+Los vencimientos dependen del noveno dígito del RUC, el régimen, el período y los días inhábiles. Una fecha incorrecta puede inducir a incumplimiento. El motor Python calcula fechas y montos a partir de [`config/`](config/). Gemini redacta explicaciones; el RAG aporta citas de los documentos procesados. El envío puntual requiere confirmar la acción y verificar el correo destinatario con un código temporal.
 
 ```mermaid
 flowchart LR
@@ -14,32 +14,36 @@ flowchart LR
   API --> CALC[Cálculo Python]
   API --> RAG[RAG sobre artículos]
   API --> GEM[Gemini o catálogo de contingencia]
-  API --> DB[(SQLite: perfiles y cola)]
-  DB --> HITL[Revisión del operador]
-  HITL --> SMTP[SMTP]
+  API --> OTP[Verificación temporal del correo]
+  OTP --> HITL[Confirmación del usuario]
+  HITL --> Mailjet[Mailjet API HTTPS]
 ```
 
-Las fechas nunca las calcula el modelo. Los datos del formulario pueden utilizarse para generar el calendario sin guardarse. El escaneo periódico solo toma perfiles registrados con consentimiento de correo. El envío comprueba de nuevo ese consentimiento y requiere aprobación de un operador.
+Las fechas nunca las calcula el modelo. El calendario y los próximos vencimientos aparecen después de completar los tres pasos del perfil y pulsar «Generar Calendario Oficial». El perfil se utiliza durante la sesión para generar el calendario y el recordatorio, sin guardarse. El código de correo vence en diez minutos y se consume una sola vez. El escaneo periódico y la cola histórica quedan fuera de la API pública de esta versión.
+
+La ruta experimental `POST /api/agente/ejecutar` puede pedir a Gemini que elija la siguiente herramienta dentro de una lista cerrada calculada por Python. El backend valida cada elección, limita el número de pasos y registra si decidió Gemini o el flujo seguro. No envía correos desde esa ruta: el despacho puntual conserva la verificación del destinatario y la confirmación humana en `/api/correo`, sin depender de una llamada al modelo después de consumir el código. Si Gemini no responde, el agente completa el recorrido seguro.
+
+El simulador de renta consulta siempre el cálculo determinista de Python con la tabla RIMPE configurada para 2026. Se corrigieron los casos de Emprendedor con ingresos de hasta USD 20.000 y de Negocio Popular que supera ese límite conforme al [art. 97.6 de la LRTI publicada por el SRI](https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/7da8c609-4299-4597-8825-29446242c63b/LEY_DE_REGIMEN_TRIBUTARIO_INTERNO_-_LRTI.pdf) y la [guía oficial de declaración del ejercicio 2025](https://www.sri.gob.ec/declaracion-impuesto-a-la-renta-2025). La simulación es referencial y no incorpora retenciones ni beneficios individuales.
 
 ## Ejecución local en unos diez minutos
 
-Requisitos: Python 3.11 o 3.12, Node.js 22 y npm. En la raíz del repositorio:
+Requisitos: Git, Python 3.11 o 3.12, Node.js 22 y npm. En PowerShell:
 
 ```powershell
+git clone https://github.com/CristhianPinos/CalendarioTributarioRIMPE.git
+Set-Location CalendarioTributarioRIMPE
 Copy-Item .env.example .env
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r backend/requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
 ```
 
-Edite `.env` para añadir `GEMINI_API_KEY` si necesita respuestas generativas en vivo. Sin clave, el servicio usa su catálogo de contingencia. Para registrar perfiles y aprobar correos, configure además `REMINDER_OPERATOR_USER` y una contraseña única de al menos 16 caracteres. El archivo [`.env.example`](.env.example) describe las variables; `.env` está excluido de Git.
+Antes de iniciar, abra `.env`: `GEMINI_API_KEY` viene vacía para usar el catálogo de contingencia; añada una clave válida si necesita explicaciones generativas. El ejemplo usa `gemini-3.8-flash`, [modelo incluido en la lista oficial de Google](https://ai.google.dev/gemini-api/docs/models). Para enviar correos, configure `MAILJET_API_KEY`, `MAILJET_SECRET_KEY` y `MAILJET_FROM_EMAIL` con un remitente validado en Mailjet. El usuario solicita un código al correo elegido, lo introduce en el modal y confirma el envío; no necesita cuenta de operador ni registrar un perfil. [`.env.example`](.env.example) describe las variables; `.env` está excluido de Git. No use datos personales reales en la demostración Free actual.
 
 Abra dos terminales desde la raíz:
 
 ```powershell
 # Terminal 1
-.\.venv\Scripts\Activate.ps1
-python -m uvicorn backend.main:app --reload --port 8000
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --port 8000
 ```
 
 ```powershell
@@ -49,7 +53,7 @@ npm ci
 npm run dev
 ```
 
-Visite [http://localhost:5173](http://localhost:5173). El frontend de desarrollo redirige `/api` y `/health` al backend local. La API ofrece [documentación interactiva](http://localhost:8000/docs) y [salud](http://localhost:8000/health). `SCHEDULER_ENABLED=false` por defecto; active el planificador solo cuando tenga perfiles consentidos y una instancia con almacenamiento duradero.
+Visite [http://localhost:5173](http://localhost:5173). El frontend de desarrollo redirige `/api` y `/health` al backend local. La API ofrece [documentación interactiva](http://localhost:8000/docs) y [salud](http://localhost:8000/health). El planificador y las rutas de perfiles y cola no se montan en esta versión. El cálculo y la consulta RAG funcionan sin una clave de Gemini.
 
 ### Docker local
 
@@ -63,37 +67,42 @@ Visite [http://localhost:8000](http://localhost:8000). `compose.yaml` conserva S
 
 ## Despliegue de demostración en Render Free
 
-[`render.yaml`](render.yaml) declara un único Web Service Docker con `/health`. Configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`. El registro de perfiles está bloqueado y no se configuran credenciales de operador ni SMTP. La demostración permite verificar calendario, RAG y explicaciones sin conservar datos personales.
+[`render.yaml`](render.yaml) declara un único Web Service Docker con `/health`. Configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`; no incluye credenciales de Mailjet. La versión actualmente publicada aún es la anterior y se verificaron en ella el calendario, el RAG y la interfaz. El nuevo flujo puntual necesita claves de Mailjet configuradas en el servidor y una prueba adicional tras un despliegue autorizado.
 
-Para desplegar: conecte este repositorio en Render, seleccione Blueprint y revise las variables del servicio. Configure `GEMINI_API_KEY` como secreto en Render solo si desea usar Gemini en vivo; la clave nunca debe entrar en Git. Publique la rama verificada, espere el build y compruebe `/health` y los [casos HTTP](docs/08-pruebas.md). La URL debe añadirse aquí **solo después** de una comprobación real.
+La instancia actual se creó mediante Blueprint y está disponible en la [URL verificada](https://calendario-rimpe-g11-demo.onrender.com/). Para reproducir el despliegue, conecte este repositorio en Render, seleccione Blueprint, revise las variables del servicio y guarde `GEMINI_API_KEY` como secreto si necesita Gemini en vivo. Publique una rama verificada, espere el build y compruebe `/health` y los [casos HTTP](docs/08-pruebas.md). La clave nunca debe entrar en Git.
 
-[Render Free usa un sistema de archivos efímero](https://render.com/docs/free) y suspende el servicio por inactividad. Por ello esta configuración es una demostración, no el despliegue de recordatorios persistentes. Para el flujo completo se requiere un servicio con [disco persistente](https://render.com/docs/disks) o una base duradera, más secretos de operador y SMTP, HTTPS y un único planificador. Véase [ADR-007](docs/09-decisiones.md).
+[Render Free usa un sistema de archivos efímero](https://render.com/docs/free) y suspende el servicio por inactividad. Por ello esta configuración sigue siendo una demostración; el código temporal se perderá si el servicio reinicia. Mailjet utiliza HTTPS y requiere claves configuradas en el servidor. Para reactivar recordatorios periódicos haría falta almacenamiento duradero y un rediseño de consentimiento y autorización. Véase [ADR-007](docs/09-decisiones.md).
 
 ## Pruebas y evaluación
 
 ```powershell
-python -m pytest backend/tests/ -q
-python eval/run_eval.py --output eval/resultados_semana4_local.json
-python scripts/production_checks.py --base-url http://localhost:8000 --output docs/08-pruebas-local.md
+.\.venv\Scripts\python.exe -m pytest backend/tests/ -q
+.\.venv\Scripts\python.exe eval/run_eval.py --output eval/resultados_reproduccion_local.json
+.\.venv\Scripts\python.exe scripts/production_checks.py --base-url http://localhost:8000 --output docs/08-pruebas-reproduccion-local.md
 ```
 
-Tras desplegar, reemplace la URL por la pública y genere `docs/08-pruebas.md`. Para comparar el mismo dataset por HTTP:
+La batería de 18 casos y la evaluación ya se ejecutaron contra la URL pública. Para repetirlas sin reemplazar los informes archivados:
 
 ```powershell
-python eval/run_eval.py --base-url https://SU-SERVICIO.onrender.com --output eval/resultados_evaluacion.json
+.\.venv\Scripts\python.exe scripts/production_checks.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output docs/08-pruebas-reproduccion.md
+.\.venv\Scripts\python.exe eval/run_eval.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output eval/resultados_reproduccion_render.json
 ```
 
-La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Los resultados de la semana 3 se conservan en [`eval/resultados_semana3.json`](eval/resultados_semana3.json). La comparación documentada está en [`docs/07-evaluacion.md`](docs/07-evaluacion.md). La prueba de una tarifa hipotética modifica solo un YAML temporal; no altera las reglas tributarias oficiales del repositorio.
+La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Para probar manualmente el formulario hay [15 casos ficticios sin correo](docs/datos-prueba-perfiles.md); no se cargan en la aplicación ni prueban inscripción real en el SRI. Los resultados de la semana 3 se conservan en [`eval/resultados_semana3.json`](eval/resultados_semana3.json). La [auditoría RAG local](docs/07-evaluacion.md#9-auditoría-local-del-rag-posterior-a-la-revisión-de-fuentes) distingue presencia de cita y fuente pertinente: 15/16 aciertos por artículo y 4/5 por documento y artículo en la muestra curada. La consulta sobre IVA de Negocio Popular sigue sin recuperar la fuente directa entre las tres primeras. La prueba de una tarifa hipotética modifica solo un YAML temporal; no altera las reglas tributarias oficiales del repositorio.
 
 ## Privacidad, autorización y límites
 
-- Las rutas `/api/perfiles` y `/api/flujo` exigen autenticación de operador. El consentimiento de correo empieza desactivado y puede revocarse. La base SQLite y los respaldos contienen datos personales; no se publican.
-- Los logs no incluyen RUC ni correo completos. `ENVIADO` significa aceptación por SMTP, no entrega o lectura. `ESTADO_INCIERTO` bloquea el reintento automático.
+- Las rutas `/api/perfiles` y `/api/flujo` no están expuestas. El envío puntual requiere código temporal enviado al destinatario, confirmación explícita y un intervalo mínimo entre envíos al mismo correo. No se guarda el perfil tributario; los códigos y contadores de tasa viven solo en memoria del proceso.
+- `POST /api/obligaciones/explicar` limita las consultas por IP (12 por 60 segundos) y por instancia (30 por 60 segundos); al agotar la ventana responde `429` con `Retry-After`. Los valores se pueden ajustar con `GEMINI_RATE_LIMIT_PER_CLIENT`, `GEMINI_RATE_LIMIT_GLOBAL` y `GEMINI_RATE_LIMIT_WINDOW_SECONDS`. La entrada variable y la salida de Gemini están acotadas. Los contadores se reinician con el proceso y no se comparten entre instancias; para varias réplicas se requeriría un almacén compartido.
+- `/api/agente/ejecutar` comparte esa cuota y reserva cuatro llamadas por ejecución, máximo de una selección por herramienta. El selector no transmite RUC, correo, nombre, importe ni la instrucción libre a Gemini. La versión publicada aún no incluye esta selección.
+- Los logs no incluyen RUC ni correo completos. `ENVIADO` significa aceptación por Mailjet, no entrega o lectura. `ESTADO_INCIERTO` bloquea el reintento automático en la cola histórica.
 - El índice RAG y las reglas fiscales reflejan los documentos y la configuración versionados. Deben verificarse contra nuevas publicaciones del SRI antes de usarse para otro ejercicio. No se cambian reglas tributarias por una respuesta del LLM.
-- La demostración Free no prueba persistencia tras reinicio, SMTP real ni el planificador diario. Tampoco sustituye la revisión de un profesional contable.
-- El servicio público aún no aplica una cuota de solicitudes por cliente. Véase la [matriz de riesgos](docs/riesgos.md).
+- La versión desplegada en Render todavía usa el commit `84cc378`; el flujo de correo verificado y la integración con Mailjet están solo en el espacio local y no se han probado allí. Una consulta sintética al endpoint de explicaciones devolvió el catálogo de contingencia tras 54,3 s y 0 tokens; los logs registraron dos timeouts y un HTTP 503 del proveedor. Gemini en vivo requiere una nueva verificación satisfactoria. La aplicación tampoco sustituye la revisión de un profesional contable.
+- El servicio público del commit `84cc378` aún no aplica esta cuota de Gemini por cliente. Véase la [matriz de riesgos](docs/riesgos.md).
 
 ## Uso ético de IA generativa
+
+La [declaración de uso de IA](docs/declaracion-uso-ia.md) identifica las funciones de Gemini, el papel del RAG y de Python, la asistencia de IA durante el desarrollo y los límites verificados. El [seguimiento de observaciones](docs/evidencias/semana-4/observaciones-revision.md) distingue lo publicado, lo probado solo en local y lo pendiente.
 
 Gemini se usa para redactar explicaciones pedagógicas. Python conserva la autoridad sobre cálculos y fechas. El RAG exige citas o se abstiene; las consultas orientadas a evasión reciben rechazo. El agente no autoriza envíos por sí mismo. Los resultados pueden contener errores de interpretación y requieren contraste con las fuentes oficiales.
 
@@ -104,7 +113,7 @@ Gemini se usa para redactar explicaciones pedagógicas. Python conserva la autor
 | Cristhian Pinos | Fundamentos y arquitectura; backend tributario y Gemini; pipeline RAG, agente, evaluación y CI (`77adf34`, `adcb736`, `ffb9c3e`, `50b09db`). |
 | Juan Lucumi | SPA React y calendario; refactor con `Decimal`, integración SMTP y formulario paso a paso (`c7cec18`, `31cdbed`). |
 
-Los cambios de seguridad, persistencia y fase 4 se documentan en el árbol de trabajo actual; esta tabla refleja commits publicados y no atribuye trabajo no verificado.
+La tabla atribuye únicamente aportes respaldados por commits. Los controles de seguridad y persistencia y el empaquetado inicial de la fase 4 figuran en el commit [`84cc378`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/84cc378bac8fc1322818c24451b54f78bde86e02) de Cristhian Pinos. Las actualizaciones documentales posteriores permanecen en el árbol de trabajo hasta su publicación.
 
 ## Documentación
 
@@ -115,3 +124,4 @@ Los cambios de seguridad, persistencia y fase 4 se documentan en el árbol de tr
 - [Decisiones técnicas](docs/09-decisiones.md)
 - [Automatización y respaldos](docs/10-automatizacion.md)
 - [Riesgos](docs/riesgos.md)
+- [Presentación de sustentación en PDF](docs/sustentacion-grupo11.pdf) y [guion de 12 minutos](docs/guion-sustentacion.md)

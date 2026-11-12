@@ -1,4 +1,4 @@
-"""Resultados reales de SMTP y transiciones de la cola HITL."""
+"""Resultados de Mailjet y transiciones de la cola HITL histórica."""
 
 from datetime import datetime, timezone
 
@@ -19,10 +19,8 @@ def _input():
     )
 
 
-def _smtp_env(monkeypatch):
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("SMTP_USER", "operador@example.com")
-    monkeypatch.setenv("SMTP_PASSWORD", "clave-de-prueba")
+def _mail_env(monkeypatch):
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.configurado", lambda: True)
 
 
 def _store(tmp_path):
@@ -39,9 +37,8 @@ def _store(tmp_path):
     return store
 
 
-def test_without_smtp_is_simulated_and_retryable(monkeypatch, tmp_path):
-    for key in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"):
-        monkeypatch.setenv(key, "")
+def test_without_mailjet_is_simulated_and_retryable(monkeypatch, tmp_path):
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.configurado", lambda: False)
     store = _store(tmp_path)
     result = confirmar_y_despachar_recordatorio("REC-1", "operador", store)
     assert result.estado == "SIMULADO"
@@ -53,12 +50,13 @@ def test_without_smtp_is_simulated_and_retryable(monkeypatch, tmp_path):
 
 
 def test_connection_failure_keeps_item_retryable(monkeypatch, tmp_path):
-    _smtp_env(monkeypatch)
+    from backend.services.mailjet_service import MailjetError
+    _mail_env(monkeypatch)
 
     def fail_connect(*args, **kwargs):
-        raise ConnectionError("SMTP no disponible")
+        raise MailjetError("Proveedor no disponible")
 
-    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", fail_connect)
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.enviar_correo", fail_connect)
     store = _store(tmp_path)
     first = confirmar_y_despachar_recordatorio("REC-1", "operador", store)
     assert first.estado == "ERROR_ENVIO"
@@ -67,17 +65,10 @@ def test_connection_failure_keeps_item_retryable(monkeypatch, tmp_path):
 
     calls = []
 
-    class SMTPFake:
-        def __init__(self, *args, **kwargs): pass
-        def __enter__(self): return self
-        def __exit__(self, *args): pass
-        def starttls(self): pass
-        def login(self, *args): pass
-        def sendmail(self, *args):
-            calls.append(args)
-            return {}
-
-    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", SMTPFake)
+    def accepted(*args):
+        calls.append(args)
+        return "12345"
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.enviar_correo", accepted)
     second = confirmar_y_despachar_recordatorio("REC-1", "operador", store)
     third = confirmar_y_despachar_recordatorio("REC-1", "operador", store)
     assert second.estado == third.estado == "ENVIADO"
@@ -86,18 +77,14 @@ def test_connection_failure_keeps_item_retryable(monkeypatch, tmp_path):
     assert listar_recordatorios_pendientes(store) == []
 
 
-def test_sendmail_exception_is_uncertain_and_never_auto_retried(monkeypatch, tmp_path):
-    _smtp_env(monkeypatch)
+def test_mailjet_timeout_is_uncertain_and_never_auto_retried(monkeypatch, tmp_path):
+    from backend.services.mailjet_service import MailjetUncertainError
+    _mail_env(monkeypatch)
 
-    class SMTPFake:
-        def __init__(self, *args, **kwargs): pass
-        def __enter__(self): return self
-        def __exit__(self, *args): pass
-        def starttls(self): pass
-        def login(self, *args): pass
-        def sendmail(self, *args): raise TimeoutError("respuesta SMTP perdida")
+    def uncertain(*args):
+        raise MailjetUncertainError("Respuesta perdida")
 
-    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", SMTPFake)
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.enviar_correo", uncertain)
     store = _store(tmp_path)
     result = confirmar_y_despachar_recordatorio("REC-1", "operador", store)
     assert result.estado == "ESTADO_INCIERTO"
@@ -109,16 +96,7 @@ def test_sendmail_exception_is_uncertain_and_never_auto_retried(monkeypatch, tmp
         confirmar_y_despachar_recordatorio("REC-1", "operador", store)
 
 
-def test_smtp_acceptance_survives_quit_failure(monkeypatch):
-    _smtp_env(monkeypatch)
-
-    class SMTPFake:
-        def __init__(self, *args, **kwargs): pass
-        def __enter__(self): return self
-        def __exit__(self, *args): raise ConnectionError("QUIT falló")
-        def starttls(self): pass
-        def login(self, *args): pass
-        def sendmail(self, *args): return {}
-
-    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", SMTPFake)
+def test_mailjet_acceptance_reports_sent(monkeypatch):
+    _mail_env(monkeypatch)
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.enviar_correo", lambda *args: "12345")
     assert tool_enviar_recordatorio(_input()).estado == "ENVIADO"

@@ -40,6 +40,10 @@ logger = logging.getLogger("rimpe.llm_service")
 
 # Modelos recomendados ordenados por prioridad de disponibilidad
 PRIMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+try:
+    MAX_OUTPUT_TOKENS = max(256, min(8192, int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "4096"))))
+except ValueError:
+    MAX_OUTPUT_TOKENS = 4096
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 PROMPTS_DIR = BASE_DIR / "backend" / "prompts"
 
@@ -84,12 +88,12 @@ FALLBACK_OBLIGACIONES: Dict[str, Dict[str, str]] = {
         "explicacion_sencilla": (
             "Como contribuyente RIMPE Emprendedor, debes consolidar y reportar todas tus ventas y compras "
             "gravadas con tarifa 15% o tarifa 0% efectuadas entre el 1 de enero y el 30 de junio. "
-            "Si no tuviste actividad económica durante este periodo, igualmente estás obligado a presentar la "
-            "declaración en ceros para mantener tu RUC al día."
+            "Si no registraste operaciones durante el período, revisa las obligaciones activas de tu RUC "
+            "y la información precargada antes de presentar la declaración."
         ),
         "consecuencia_incumplimiento": (
-            "La presentación tardía genera una multa mínima de $30,00 USD conforme al Art. 100 de la LRTI "
-            "más los intereses acumulados por cada mes o fracción de mora en caso de existir impuesto a pagar."
+            "La presentación tardía puede generar multas e intereses según la obligación y el impuesto a pagar; "
+            "verifica el importe aplicable en el SRI."
         ),
         "sugerencia_accion": (
             "Revisa tus comprobantes electrónicos emitidos en el portal SRI. Accede con tu clave al Formulario 104 "
@@ -106,8 +110,8 @@ FALLBACK_OBLIGACIONES: Dict[str, Dict[str, str]] = {
             "Permite liquidar el IVA cobrado a tus clientes restando el crédito tributario por tus adquisiciones de negocio."
         ),
         "consecuencia_incumplimiento": (
-            "Sanción pecuniaria por omisión o declaración tardía ($30,00 USD mínimo) y posible suspensión temporal "
-            "de la vigencia de autorización de tus comprobantes de venta."
+            "La omisión o presentación tardía puede generar sanciones e intereses según el caso; "
+            "consulta las obligaciones pendientes en el SRI."
         ),
         "sugerencia_accion": (
             "Descarga el reporte de facturación electrónica del segundo semestre y llena el formulario de IVA semestral."
@@ -124,8 +128,8 @@ FALLBACK_OBLIGACIONES: Dict[str, Dict[str, str]] = {
             "oficial (fracción básica más porcentaje marginal sobre el excedente) descontando las retenciones que te hayan realizado."
         ),
         "consecuencia_incumplimiento": (
-            "Recargo del 20% sobre el impuesto determinado más intereses de mora calculados por el Banco Central del Ecuador "
-            "y multas tipificadas en el Código Tributario."
+            "La presentación tardía puede generar multas e intereses de mora según el caso; "
+            "consulta los valores determinados por el SRI."
         ),
         "sugerencia_accion": (
             "Suma tus ingresos brutos del año fiscal, resta tus retenciones del 1% y liquida mediante el Formulario de Renta Personas Naturales."
@@ -142,7 +146,7 @@ FALLBACK_OBLIGACIONES: Dict[str, Dict[str, str]] = {
             "Esta cuota anual incluye y consolida el impuesto a la renta y el IVA, por lo que no debes hacer declaraciones de IVA adicionales."
         ),
         "consecuencia_incumplimiento": (
-            "Multa mínima reglamentaria de $15,00 USD si no se causa impuesto, o recargos e intereses de mora sobre la cuota fija aplicable."
+            "La presentación tardía puede generar multas e intereses según el caso; verifica los valores en el SRI."
         ),
         "sugerencia_accion": (
             "Verifica el total de tus notas de venta o facturas emitidas y cancela tu cuota fija en línea mediante débito bancario o ventanilla."
@@ -159,13 +163,33 @@ FALLBACK_OBLIGACIONES: Dict[str, Dict[str, str]] = {
             "bajo las reglas del Régimen General, aplicando la tarifa vigente de IVA y facturando electrónicamente con desglose."
         ),
         "consecuencia_incumplimiento": (
-            "Clausura del establecimiento o multas formales del Régimen General por no emitir comprobantes autorizados con IVA o no liquidarlo a tiempo."
+            "El incumplimiento puede generar sanciones según la infracción concreta; consulta las obligaciones y valores en el SRI."
         ),
         "sugerencia_accion": (
             "Presenta tu Formulario 104 declarando exclusivamente las ventas y adquisiciones de la actividad profesional o excluida."
         ),
         "canal_recomendado": "Portal SRI en Línea > Declaraciones > Formulario 104 Régimen General."
     }
+}
+
+# Documentos de sustento del art. 224 del Reglamento a la LRTI. No implica que
+# todos sean obligatorios ni que deban adjuntarse en este calendario.
+DOCUMENTOS_POR_OBLIGACION = {
+    "IVA_SEMESTRAL_1": "Revisa las facturas electrónicas y otros comprobantes de venta emitidos entre enero y junio, los comprobantes de tus adquisiciones y las retenciones recibidas cuando correspondan.",
+    "IVA_SEMESTRAL_2": "Revisa las facturas electrónicas y otros comprobantes de venta emitidos entre julio y diciembre, los comprobantes de tus adquisiciones y las retenciones recibidas cuando correspondan.",
+    "RENTA_ANUAL_EMPRENDEDOR": "Reúne los comprobantes de venta de los ingresos del ejercicio, los documentos de descuentos o devoluciones y los comprobantes de retención recibidos cuando correspondan.",
+    "RENTA_ANUAL_NEGOCIO_POPULAR": "Revisa tus notas de venta o facturas electrónicas emitidas y los comprobantes que sustentan tus adquisiciones durante el ejercicio.",
+    "IVA_REGIMEN_GENERAL_MIXTO": "Revisa los comprobantes de venta y adquisición relacionados con la actividad que corresponda declarar, y los comprobantes de retención cuando procedan.",
+}
+
+# Las referencias se fijan fuera del LLM para que el modal no muestre citas
+# inventadas. Se contrastaron con la LRTI, el Reglamento y la ficha IVA del SRI.
+BASE_LEGAL_POR_OBLIGACION = {
+    "IVA_SEMESTRAL_1": "LRTI, art. 97.8; Reglamento a la LRTI, arts. 224 y 225.",
+    "IVA_SEMESTRAL_2": "LRTI, art. 97.8; Reglamento a la LRTI, arts. 224 y 225.",
+    "RENTA_ANUAL_EMPRENDEDOR": "LRTI, art. 97.6; Reglamento a la LRTI, art. 225.",
+    "RENTA_ANUAL_NEGOCIO_POPULAR": "LRTI, art. 97.6; Reglamento a la LRTI, art. 225.",
+    "IVA_REGIMEN_GENERAL_MIXTO": "LRTI, art. 97.4 (actividades excluidas del RIMPE).",
 }
 
 
@@ -197,30 +221,29 @@ def obtener_fallback_determinista(
     sugerencia = plantilla["sugerencia_accion"]
     consecuencia = plantilla["consecuencia_incumplimiento"]
 
-    if es_declaracion_en_cero:
+    if es_declaracion_en_cero and codigo_obligacion in ("IVA_SEMESTRAL_1", "IVA_SEMESTRAL_2"):
         titulo = f"[DECLARACIÓN EN CEROS] {titulo}"
         explicacion = (
-            "GUÍA OFICIAL PARA DECLARACIÓN EN CEROS (SIN MOVIMIENTO): Aunque no hayas registrado ventas ni "
-            "compras gravadas en este semestre, el SRI exige presentar de forma 100% obligatoria tu declaración informativa "
-            "con valores en cero ($0.00). Omitir esta declaración genera multas automáticas inmediatas, aunque el impuesto a pagar sea $0.00."
+            "Si no registraste operaciones en este semestre, revisa la información precargada y las obligaciones "
+            "que constan en tu RUC antes de presentar la declaración de IVA. No inventes ventas para completar el formulario."
         )
         sugerencia = (
             "1. Accede a SRI en Línea (www.sri.gob.ec) con tu RUC y contraseña.\n"
             "2. Selecciona 'Declaraciones' > 'Declaración de Impuestos' y elige el formulario correspondiente.\n"
-            "3. En la pregunta inicial: '¿Para el período a declarar requiere registrar información?', marca NO.\n"
-            "4. Confirma que los casilleros queden en $0.00 y pulsa 'Firmar y Enviar' para descargar tu comprobante de cumplimiento."
+            "3. Revisa los datos precargados y registra únicamente información verdadera.\n"
+            "4. Si corresponde declarar sin movimiento, comprueba el resultado antes de firmar y enviar."
         )
         consecuencia = (
-            "La falta de presentación o el envío tardío de una declaración en ceros causa una multa pecuniaria de $30.00 a $60.00 USD "
-            "(Art. 100 de la LRTI), además del riesgo de bloqueo o suspensión preventiva de tu RUC."
+            "La presentación tardía puede generar multas e intereses según la normativa aplicable; verifica el valor en el SRI."
         )
 
     return RecordatorioEstructurado(
         codigo_obligacion=plantilla["codigo_obligacion"],
         titulo_pedagogico=titulo,
         fecha_limite_formateada=f"Vence impostergablemente el {fecha_vencimiento}",
-        base_legal_oficial=plantilla["base_legal_oficial"],
+        base_legal_oficial=BASE_LEGAL_POR_OBLIGACION.get(codigo_obligacion, plantilla["base_legal_oficial"]),
         explicacion_sencilla=explicacion,
+        comprobantes_validos=DOCUMENTOS_POR_OBLIGACION.get(codigo_obligacion, "Conserva los comprobantes que sustentan las operaciones declaradas y revisa sus requisitos en el SRI."),
         consecuencia_incumplimiento=consecuencia,
         sugerencia_accion=sugerencia,
         canal_recomendado=plantilla["canal_recomendado"]
@@ -247,7 +270,7 @@ def _invocar_gemini_raw(
     prompt: str,
     api_key: str,
     model: str = PRIMARY_MODEL,
-    timeout_sec: float = 25.0
+    timeout_sec: float = 8.0
 ) -> Tuple[Dict[str, Any], int]:
     """
     Ejecuta la llamada HTTP cruda al endpoint de Google Gemini con control estricto de reintentos.
@@ -265,6 +288,7 @@ def _invocar_gemini_raw(
             "fecha_limite_formateada": {"type": "STRING"},
             "base_legal_oficial": {"type": "STRING"},
             "explicacion_sencilla": {"type": "STRING"},
+            "comprobantes_validos": {"type": "STRING"},
             "consecuencia_incumplimiento": {"type": "STRING"},
             "sugerencia_accion": {"type": "STRING"},
             "canal_recomendado": {"type": "STRING"}
@@ -275,6 +299,7 @@ def _invocar_gemini_raw(
             "fecha_limite_formateada",
             "base_legal_oficial",
             "explicacion_sencilla",
+            "comprobantes_validos",
             "consecuencia_incumplimiento",
             "sugerencia_accion",
             "canal_recomendado"
@@ -288,7 +313,8 @@ def _invocar_gemini_raw(
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseSchema": schema,
-            "temperature": 0.2
+            "temperature": 0.2,
+            "maxOutputTokens": MAX_OUTPUT_TOKENS,
         }
     }
 
@@ -356,7 +382,7 @@ def generar_explicacion_obligacion(
             modelo_utilizado="fallback-determinista-sri",
             tokens_utilizados=0,
             tiempo_generacion_ms=latency,
-            fuente_conocimiento="Catálogo Oficial SRI (Offline Fallback - LRTI & Resoluciones 24-0027/23-0034)"
+            fuente_conocimiento="Catálogo local de contingencia basado en la LRTI y el Reglamento publicados por el SRI"
         )
 
     # Construir el prompt para la IA
@@ -372,10 +398,11 @@ def generar_explicacion_obligacion(
                 .replace("{tiene_actividades_excluidas}", "Sí" if request.tiene_actividades_excluidas else "No")
                 .replace("{ingresos_estimados}", f"{request.ingresos_estimados or 0:.2f}")
                 .replace("{contexto_adicional}", request.contexto_adicional or "Ninguno")
+                .replace("{comprobantes_referencia}", DOCUMENTOS_POR_OBLIGACION.get(request.codigo_obligacion, "Verifica los documentos de sustento en el SRI."))
             )
         else:
             base_prompt = (
-                "Eres un asesor tributario experto del Servicio de Rentas Internas (SRI) del Ecuador. "
+                "Eres un asistente que explica obligaciones tributarias de Ecuador; no afirmes pertenecer al SRI. "
                 "Explica con claridad, empatía y rigor legal la siguiente obligación para un contribuyente ecuatoriano:\n"
                 f"- Código de obligación: {request.codigo_obligacion}\n"
                 f"- Régimen RIMPE: {request.tipo_regimen.value}\n"
@@ -387,16 +414,17 @@ def generar_explicacion_obligacion(
                 "1. Cita las normas legales vigentes de Ecuador (LRTI, RALRTI, Ley de Eficiencia Económica, Resoluciones NAC-DGERCGC24-00000027 o 23-0034).\n"
                 "2. NO inventes fechas de vencimiento; utiliza estrictamente la fecha de vencimiento límite proporcionada.\n"
                 "3. La explicación debe ser comprensible para un microemprendedor, sin perder precisión jurídica.\n"
-                "4. Menciona las sanciones o multas tipificadas por el SRI ante el retraso."
+                "4. Explica posibles consecuencias del retraso sin inventar importes fijos.\n"
+                f"5. Explica los documentos de sustento pertinentes: {DOCUMENTOS_POR_OBLIGACION.get(request.codigo_obligacion, 'Consulta los comprobantes aplicables en el SRI.')}."
             )
 
-    if request.es_declaracion_en_cero:
+    if request.es_declaracion_en_cero and request.codigo_obligacion in ("IVA_SEMESTRAL_1", "IVA_SEMESTRAL_2"):
         base_prompt += (
             "\n\nCASO ESPECIAL - DECLARACIÓN EN CERO:\n"
             "El contribuyente indica que NO TUVO ACTIVIDAD ECONÓMICA NI VENTAS en este período y va a DECLARAR EN CERO.\n"
             "Explica enfáticamente:\n"
-            "1. Que declarar en cero es 100% OBLIGATORIO por ley y que no hacerlo acarrea multas de $30 a $60 USD.\n"
-            "2. El paso a paso exacto para seleccionar 'NO' en registro de información y enviar la declaración en ceros en sri.gob.ec.\n"
+            "1. Orienta a revisar la información precargada y las obligaciones del RUC antes de declarar sin movimiento.\n"
+            "2. No afirmes multas fijas ni que se deba marcar una respuesta concreta en el portal sin verificar el caso.\n"
         )
 
     try:
@@ -406,6 +434,14 @@ def generar_explicacion_obligacion(
             model=model
         )
         recordatorio = RecordatorioEstructurado(**parsed_json)
+        if recordatorio.codigo_obligacion != request.codigo_obligacion:
+            raise ValueError("Gemini devolvió una obligación distinta a la solicitada")
+        if not recordatorio.explicacion_sencilla.strip() or not recordatorio.sugerencia_accion.strip():
+            raise ValueError("Gemini devolvió una explicación o acción vacía")
+        if request.codigo_obligacion in BASE_LEGAL_POR_OBLIGACION:
+            recordatorio.base_legal_oficial = BASE_LEGAL_POR_OBLIGACION[request.codigo_obligacion]
+        if not recordatorio.comprobantes_validos.strip():
+            recordatorio.comprobantes_validos = DOCUMENTOS_POR_OBLIGACION.get(request.codigo_obligacion, "Verifica los documentos de sustento en el SRI.")
         latency = round((time.time() - start_time) * 1000, 2)
 
         return ExplicacionObligacionResponse(
@@ -430,5 +466,5 @@ def generar_explicacion_obligacion(
             modelo_utilizado="fallback-determinista-sri",
             tokens_utilizados=0,
             tiempo_generacion_ms=latency,
-            fuente_conocimiento="Catálogo Oficial SRI (Offline Fallback - LRTI & Resoluciones 24-0027/23-0034)"
+            fuente_conocimiento="Catálogo local de contingencia basado en la LRTI y el Reglamento publicados por el SRI"
         )

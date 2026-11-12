@@ -8,7 +8,7 @@ Expone los endpoints para:
 """
 
 from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, status, Response
+from fastapi import APIRouter, HTTPException, status, Response, Depends
 from backend.schemas import (
     ExplicacionObligacionRequest,
     ExplicacionObligacionResponse,
@@ -17,6 +17,7 @@ from backend.schemas import (
 )
 from backend.services.llm import generar_explicacion_obligacion, FALLBACK_OBLIGACIONES
 from backend.services.calculator import simular_cuota_renta
+from backend.services.rate_limit import limit_explanation_requests
 
 router = APIRouter(prefix="/api", tags=["Obligaciones & IA"])
 
@@ -32,7 +33,10 @@ router = APIRouter(prefix="/api", tags=["Obligaciones & IA"])
         "validada estrictamente contra el esquema RecordatorioEstructurado."
     )
 )
-def explicar_obligacion(request: ExplicacionObligacionRequest) -> ExplicacionObligacionResponse:
+def explicar_obligacion(
+    request: ExplicacionObligacionRequest,
+    _quota: None = Depends(limit_explanation_requests),
+) -> ExplicacionObligacionResponse:
     """Endpoint que genera la explicación con el modelo generativo."""
     try:
         return generar_explicacion_obligacion(request=request)
@@ -61,10 +65,10 @@ def calcular_simulacion_renta(request: SimulacionRentaRequest) -> SimulacionRent
             tipo_regimen=request.tipo_regimen.value
         )
         return SimulacionRentaResponse(**resultado)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Los datos de la simulación no son válidos para el régimen indicado."
+            detail=str(exc)
         )
     except Exception:
         raise HTTPException(

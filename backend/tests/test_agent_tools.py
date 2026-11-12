@@ -6,7 +6,7 @@ Caso N.º 11 – Grupo 11: Calendario Tributario RIMPE
 Verifica:
 1. Herramienta calcular_vencimientos (determinista con Pydantic).
 2. Herramienta calcular_iva (tarifas desacopladas de config/ 15%, 5%, 0%).
-3. Herramienta redactar_recordatorio (citas normativas RAG).
+3. Herramienta redactar_recordatorio (referencias normativas verificadas).
 4. Herramienta enviar_recordatorio (compuerta HITL con confirmación obligatoria).
 5. Agente orquestador con límite estricto de iteraciones (máx 5).
 6. Router HTTP /api/agente.
@@ -95,11 +95,11 @@ def test_tool_calcular_iva_tarifa_diferenciada():
 
 
 # ------------------------------------------------------------------------------
-# 3. PRUEBAS TOOL 3: REDACTAR RECORDATORIO (CON CITAS RAG)
+# 3. PRUEBAS TOOL 3: REDACTAR RECORDATORIO
 # ------------------------------------------------------------------------------
 
 def test_tool_redactar_recordatorio_incluye_citas():
-    """Verifica que el recordatorio redactado incorpore citas legales del RAG."""
+    """Verifica que el recordatorio incorpore referencias legales pertinentes."""
     inp = RedactarRecordatorioInput(
         codigo_obligacion="IVA_SEMESTRAL_1",
         ruc=RUC_VALIDO,
@@ -110,13 +110,41 @@ def test_tool_redactar_recordatorio_incluye_citas():
     )
     out = tool_redactar_recordatorio(inp)
 
-    assert "Declaración Semestral de IVA" in out.asunto
+    assert "Declaración semestral de IVA" in out.asunto
     assert "2026-07-24" in out.asunto
     assert "Comercial Pinos & Asociados" in out.cuerpo_recordatorio
     assert len(out.citas_normativas) >= 1
     # Verifica que el cuerpo incluya citas formales
     assert "[" in out.cuerpo_recordatorio and "]" in out.cuerpo_recordatorio
     assert out.requiere_confirmacion_humana is True
+
+
+@pytest.mark.parametrize("codigo,fecha,anio,fragmento", [
+    ("IVA_SEMESTRAL_1", "2027-07-20", 2027, "enero-junio"),
+    ("IVA_SEMESTRAL_2", "2028-01-20", 2027, "julio-diciembre"),
+    ("RENTA_ANUAL_EMPRENDEDOR", "2028-03-20", 2027, "renta RIMPE Emprendedor"),
+    ("RENTA_ANUAL_NEGOCIO_POPULAR", "2028-05-20", 2027, "renta RIMPE Negocio Popular"),
+    ("IVA_REGIMEN_GENERAL_MIXTO", "2027-07-20", 2027, "actividades excluidas"),
+])
+def test_recordatorio_corresponde_al_evento_y_anio(codigo, fecha, anio, fragmento):
+    rec = tool_redactar_recordatorio(RedactarRecordatorioInput(
+        codigo_obligacion=codigo, ruc=RUC_VALIDO, razon_social="Perfil sintético",
+        tipo_regimen="RIMPE_EMPRENDEDOR", fecha_vencimiento=fecha, anio_fiscal=anio,
+    ))
+    assert fragmento in rec.asunto
+    assert fecha in rec.asunto and fecha in rec.cuerpo_recordatorio
+    assert f"ejercicio fiscal {anio}" in rec.cuerpo_recordatorio
+    assert "vence el próximo" not in rec.cuerpo_recordatorio
+    assert "confirmación antes" not in rec.cuerpo_recordatorio
+    assert "comunicación oficial del SRI" in rec.cuerpo_recordatorio
+    assert rec.citas_normativas
+    if codigo.startswith("IVA"):
+        assert "Art. 97.6" not in rec.cuerpo_recordatorio
+    if codigo == "IVA_REGIMEN_GENERAL_MIXTO":
+        assert "Semestral" not in rec.asunto
+        assert "Fecha orientativa" in rec.cuerpo_recordatorio
+    if codigo.startswith("IVA_SEMESTRAL"):
+        assert "debe presentar su declaración informativa en cero" not in rec.cuerpo_recordatorio
 
 
 # ------------------------------------------------------------------------------
@@ -141,19 +169,12 @@ def test_tool_enviar_recordatorio_bloqueado_sin_confirmacion():
 
 def test_tool_enviar_recordatorio_exitoso_con_confirmacion(monkeypatch):
     """Verifica que con confirmación humana se efectúe el envío y genere ID de auditoría."""
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("SMTP_USER", "operador@example.com")
-    monkeypatch.setenv("SMTP_PASSWORD", "clave-de-prueba")
-
-    class SMTPFake:
-        def __init__(self, *args, **kwargs): pass
-        def __enter__(self): return self
-        def __exit__(self, *args): pass
-        def starttls(self): pass
-        def login(self, *args): pass
-        def sendmail(self, *args): return {}
-
-    monkeypatch.setattr("backend.services.agent_service.smtplib.SMTP", SMTPFake)
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.configurado", lambda: True)
+    def send(destinatario, asunto, texto, html):
+        assert destinatario == "contribuyente@empresa.ec"
+        assert "LRTI" in texto
+        return "12345"
+    monkeypatch.setattr("backend.services.agent_service.mailjet_service.enviar_correo", send)
     inp = EnviarRecordatorioInput(
         destinatario="contribuyente@empresa.ec",
         asunto="Recordatorio IVA SRI",
@@ -197,6 +218,21 @@ def test_agente_ejecuta_ciclo_completo_con_hitl():
     assert len(resultado.trazas_herramientas) >= 3
 
 
+def test_secuencia_actual_del_agente_sin_modelo():
+    """Fija el flujo que ya funciona antes de incorporar selección generativa."""
+    resultado = AgenteTributarioRIMPE(max_iteraciones=5).ejecutar(
+        instruccion="Preparar un recordatorio",
+        perfil={"ruc": RUC_VALIDO, "tipo_regimen": "RIMPE_EMPRENDEDOR",
+                "email": "prueba@example.org", "anio": 2026},
+        base_imponible_iva=100.0,
+        confirmacion_envio=False,
+    )
+    assert [traza.herramienta for traza in resultado.trazas_herramientas] == [
+        "calcular_vencimientos", "calcular_iva", "redactar_recordatorio", "enviar_recordatorio"
+    ]
+    assert resultado.estado_envio == "PENDIENTE_CONFIRMACION"
+
+
 def test_agente_respeta_limite_estricto_iteraciones():
     """Verifica que si max_iteraciones es menor, el agente se detenga inmediatamente sin loops."""
     agente_restringido = AgenteTributarioRIMPE(max_iteraciones=2)
@@ -214,6 +250,8 @@ def test_agente_respeta_limite_estricto_iteraciones():
 
     assert resultado.num_iteraciones == 2
     assert resultado.limite_alcanzado is True
+    assert resultado.exito is False
+    assert resultado.estado_envio is None
 
 
 def test_router_api_agente():

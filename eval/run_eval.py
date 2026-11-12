@@ -8,12 +8,14 @@ Evalúa de forma reproducible:
    verificando precisión exacta de fechas de vencimiento con traslados de feriados y fines de semana.
 2. 20 Preguntas Normativas (16 con sustento legal + 4 casos de abstención obligatoria)
    midiendo Hit@3, Citas Obligatorias y Matriz de Confusión de Abstención.
-3. Exporta métricas consolidadas en eval/resultados_evaluacion.json.
+3. Exporta métricas consolidadas sin reemplazar la evidencia histórica de Render.
 """
 
 import os
 import sys
 import json
+import re
+import unicodedata
 import logging
 import argparse
 import time
@@ -35,7 +37,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger("evaluacion_rimpe")
 
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "dataset_evaluacion.json")
-RESULTADOS_PATH = os.path.join(os.path.dirname(__file__), "resultados_evaluacion.json")
+RESULTADOS_PATH = os.path.join(os.path.dirname(__file__), "resultados_reproduccion_local.json")
 BASE_URL = None
 LATENCIES = {"calculo": [], "rag": []}
 
@@ -126,6 +128,14 @@ def evaluar_perfiles_referencia(perfiles: List[Dict[str, Any]]) -> Dict[str, Any
                     "calculada": f_calc
                 }
 
+        for obligacion, f_calc in fechas_calculadas.items():
+            if obligacion not in fechas_esperadas:
+                perfil_ok = False
+                discrepancias[obligacion] = {
+                    "esperada": None,
+                    "calculada": f_calc
+                }
+
         if perfil_ok and len(discrepancias) == 0:
             aciertos_completos += 1
 
@@ -156,6 +166,20 @@ def evaluar_perfiles_referencia(perfiles: List[Dict[str, Any]]) -> Dict[str, Any
     }
 
 
+def _articulo_sin_parte(texto: str) -> str:
+    return re.sub(r"\s*\(Parte\s+\d+\)$", "", texto, flags=re.IGNORECASE).strip()
+
+
+def _articulo_base(texto: str) -> str:
+    """Compara el artículo completo; Art. 3 no debe coincidir con Art. 30."""
+    return _articulo_sin_parte(texto).casefold()
+
+
+def _texto_normalizado(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texto.casefold())
+                   if unicodedata.category(c) != "Mn")
+
+
 def evaluar_preguntas_normativas(preguntas: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Evalúa el motor RAG sobre las 20 preguntas normativas:
@@ -173,6 +197,9 @@ def evaluar_preguntas_normativas(preguntas: List[Dict[str, Any]]) -> Dict[str, A
     hits_top3 = 0
     citas_validas = 0
     preguntas_legitimas = 0
+    fuentes_auditadas = 0
+    aciertos_fuente_articulo = 0
+    respuestas_con_clave = 0
 
     detalles = []
 
@@ -207,29 +234,46 @@ def evaluar_preguntas_normativas(preguntas: List[Dict[str, Any]]) -> Dict[str, A
         # 2. Evaluación de preguntas legítimas (no abstención)
         hit_normativo = False
         tiene_cita_formal = False
+        fuente_articulo_correctos = None
+        contiene_clave = None
 
         if not debe_abstenerse:
             preguntas_legitimas += 1
             
-            # Hit@3: si alguna de las citas recuperadas coincide con alguno de los artículos válidos
+            # Coincidencia exacta de número de artículo; no certifica pertinencia jurídica.
             if articulos_validos:
-                for c in res_rag.citas:
-                    for a in articulos_validos:
-                        if a.lower() in c.articulo_seccion.lower() or a.lower() in c.cita_oficial.lower():
-                            hit_normativo = True
-                            break
-                    if hit_normativo:
-                        break
-            else:
-                hit_normativo = len(res_rag.citas) > 0
+                hit_normativo = any(
+                    _articulo_base(c.articulo_seccion) == _articulo_base(a)
+                    for c in res_rag.citas for a in articulos_validos
+                )
 
             if hit_normativo:
                 hits_top3 += 1
 
-            # Citas formales con corchetes [..., Art. ...]
-            if len(citas) > 0 and any("[" in c and "]" in c for c in citas):
-                tiene_cita_formal = True
+            # Formato y consistencia de la cita estructurada, no validez jurídica.
+            tiene_cita_formal = bool(res_rag.citas) and all(
+                c.cita_oficial == f"[{c.documento}, {_articulo_sin_parte(c.articulo_seccion)}]"
+                for c in res_rag.citas
+            )
+            if tiene_cita_formal:
                 citas_validas += 1
+
+            fuentes_esperadas = q.get("fuentes_esperadas", [])
+            if fuentes_esperadas:
+                fuentes_auditadas += 1
+                fuente_articulo_correctos = any(
+                    c.documento.casefold() == fuente["documento"].casefold()
+                    and _articulo_base(c.articulo_seccion) == _articulo_base(fuente["articulo"])
+                    for c in res_rag.citas for fuente in fuentes_esperadas
+                )
+                if fuente_articulo_correctos:
+                    aciertos_fuente_articulo += 1
+
+            clave = q.get("cita_clave")
+            if clave:
+                contiene_clave = _texto_normalizado(clave) in _texto_normalizado(res_rag.respuesta)
+                if contiene_clave:
+                    respuestas_con_clave += 1
 
         detalles.append({
             "id": q_id,
@@ -243,6 +287,9 @@ def evaluar_preguntas_normativas(preguntas: List[Dict[str, Any]]) -> Dict[str, A
             "documentos_consultados": docs,
             "hit_top3": hit_normativo if not debe_abstenerse else None,
             "tiene_cita_formal": tiene_cita_formal if not debe_abstenerse else None,
+            "fuentes_esperadas": q.get("fuentes_esperadas", []),
+            "fuente_articulo_correctos": fuente_articulo_correctos,
+            "contiene_clave_indicativa": contiene_clave,
             "respuesta_fragmento": res_rag.respuesta[:180] + "..." if len(res_rag.respuesta) > 180 else res_rag.respuesta
         })
 
@@ -278,7 +325,10 @@ def evaluar_preguntas_normativas(preguntas: List[Dict[str, Any]]) -> Dict[str, A
             "hits_top3": hits_top3,
             "hit_rate_top3_pct": hit_rate_top3,
             "respuestas_con_cita_formal": citas_validas,
-            "tasa_citas_obligatorias_pct": tasa_citas_pct
+            "tasa_citas_obligatorias_pct": tasa_citas_pct,
+            "fuentes_auditadas": fuentes_auditadas,
+            "aciertos_fuente_articulo": aciertos_fuente_articulo,
+            "respuestas_con_clave_indicativa": respuestas_con_clave,
         },
         "detalles": detalles
     }
@@ -312,7 +362,9 @@ def ejecutar_evaluacion(base_url=None, output=RESULTADOS_PATH):
     print(f"\n[2/2] Evaluando {len(preguntas)} Preguntas Normativas (RAG + Abstención)...")
     eval_preguntas = evaluar_preguntas_normativas(preguntas)
     print(f"      -> Hit@3 en preguntas legítimas: {eval_preguntas['metricas_recuperacion_rag']['hits_top3']}/{eval_preguntas['preguntas_legitimas']} ({eval_preguntas['metricas_recuperacion_rag']['hit_rate_top3_pct']}%)")
-    print(f"      -> Tasa de Citas Obligatorias: {eval_preguntas['metricas_recuperacion_rag']['respuestas_con_cita_formal']}/{eval_preguntas['preguntas_legitimas']} ({eval_preguntas['metricas_recuperacion_rag']['tasa_citas_obligatorias_pct']}%)")
+    print(f"      -> Citas formales coherentes con metadatos: {eval_preguntas['metricas_recuperacion_rag']['respuestas_con_cita_formal']}/{eval_preguntas['preguntas_legitimas']} ({eval_preguntas['metricas_recuperacion_rag']['tasa_citas_obligatorias_pct']}%)")
+    print(f"      -> Fuente + artículo auditados: {eval_preguntas['metricas_recuperacion_rag']['aciertos_fuente_articulo']}/{eval_preguntas['metricas_recuperacion_rag']['fuentes_auditadas']}")
+    print(f"      -> Respuesta con clave textual indicativa: {eval_preguntas['metricas_recuperacion_rag']['respuestas_con_clave_indicativa']}/{eval_preguntas['preguntas_legitimas']}")
     print(f"      -> Precisión de Abstención (TP/(TP+FP)): {eval_preguntas['metricas_abstencion']['precision_pct']}%")
     print(f"      -> Recall de Abstención (TP/(TP+FN)): {eval_preguntas['metricas_abstencion']['recall_pct']}%")
     print(f"      -> F1-Score de Seguridad: {eval_preguntas['metricas_abstencion']['f1_score_pct']}%")
@@ -323,7 +375,7 @@ def ejecutar_evaluacion(base_url=None, output=RESULTADOS_PATH):
     resultados_completos = {
         "timestamp_evaluacion": datetime.now(timezone.utc).isoformat(),
         "caso": "Caso N.º 11 - Calendario Tributario RIMPE",
-        "evaluacion_version": "4.0.0",
+        "evaluacion_version": "4.1.0",
         "origen_evaluacion": BASE_URL or "local",
         "resumen_ejecutivo": {
             "perfiles_evaluados": eval_perfiles["total_perfiles"],

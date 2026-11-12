@@ -16,6 +16,7 @@ from scripts.ingest import (
     normalizar_texto,
     inferir_regimen,
     fragmentar_por_articulos_o_secciones,
+    fragmentar_resolucion_operativa,
     CHUNKS_OUTPUT_FILE,
     FUENTES_CATALOGO
 )
@@ -41,7 +42,7 @@ def test_fragmentar_por_articulos_preserva_cabecera():
     """Verifica que el corte por artículo preserve la cabecera exacta para citas verificables."""
     muestra = (
         "Art. 97.3.- Régimen RIMPE. Se sujetan a este régimen los contribuyentes emprendedores y negocios populares.\n\n"
-        "Art. 97.6.- Declaración y pago. Los contribuyentes presentarán declaración anual de impuesto a la renta.\n\n"
+        "Art. 97.6.- Tarifa del impuesto. Los contribuyentes pagarán renta según su tramo.\n\n"
         "Art. 97.8.- Comprobantes de venta. Los negocios populares emitirán notas de venta."
     )
     meta = {
@@ -86,3 +87,23 @@ def test_archivo_rag_chunks_generado_correctamente():
     citas_lrti = [c["articulo_seccion"] for c in data["chunks"] if "LRTI" in c["documento"]]
     assert any("Art. 97.3" in cita or "97.3" in cita for cita in citas_lrti)
     assert any("Art. 97.6" in cita or "97.6" in cita for cita in citas_lrti)
+
+
+def test_resolucion_no_atribuye_considerandos_ni_firma_al_articulado():
+    muestra = (
+        "CONSIDERANDO:\nQue el artículo 83 de la Constitución establece deberes.\n"
+        "RESUELVE:\nESTABLECER NORMAS\n"
+        "Artículo 1. Objeto. - Establecer condiciones para el régimen RIMPE.\n"
+        "Artículo 2. Plazo. - El plazo se verifica conforme al calendario.\n"
+        "DISPOSICIONES GENERALES\nPrimera. - Se aplicarán las reglas pertinentes.\n"
+        "DISPOSICIÓN FINAL. - La resolución rige desde su publicación.\n"
+        "Dictó y firmó electrónicamente el director general."
+    )
+    meta = {"archivo": "resolucion.pdf", "documento": "Resolución de prueba", "vigente": True,
+            "anio_fiscal": 2026, "jerarquia": "resolucion_sri", "url": "https://sri.gob.ec"}
+    chunks = fragmentar_resolucion_operativa(muestra, meta)
+    assert [c["articulo_seccion"] for c in chunks] == [
+        "Art. 1", "Art. 2", "Disposiciones generales", "Disposición final"
+    ]
+    assert all("Art. 83" not in c["cita_oficial"] for c in chunks)
+    assert all("Dictó y firmó" not in c["contenido"] for c in chunks)
