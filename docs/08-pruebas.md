@@ -400,6 +400,10 @@ En Render, una solicitud de código al correo institucional de prueba recibió H
 
 El commit `b674bfd` publicó Flash Lite y la protección de la fecha. En la nueva versión, una consulta pública sintética de `IVA_SEMESTRAL_1` devolvió HTTP 200, `modelo_utilizado=gemini-3.5-flash-lite`, 1461 tokens, código correcto, fecha `Jueves 16 de julio de 2026`, explicación y sugerencia presentes. Una ejecución pública del agente con un perfil ficticio y `confirmacion_envio=false` registró tres herramientas (`calcular_vencimientos`, `redactar_recordatorio`, `enviar_recordatorio`), las tres con origen `gemini`, y terminó en `PENDIENTE_CONFIRMACION` sin enviar correo. La batería de regresión HTTP volvió a aprobar 18/18 casos contra este despliegue. La recepción del recordatorio autorizado fue confirmada por el usuario en el flujo real del modal. La prueba de un caso no garantiza que Gemini mantenga cuota o disponibilidad en futuras consultas.
 
+## Verificación de la versión candidata: etapa 6
+
+La [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) del commit `414bc44bfaaffaddcb62dc197db6022bed76a549` terminó satisfactoriamente: escaneo de secretos, 235 pruebas de backend, evaluación local, compilación React y construcción Docker. `/health` informó ese mismo SHA antes y después de las pruebas públicas. `scripts/production_checks.py` ejecutó de nuevo los 18 casos HTTP con perfiles sintéticos y aprobó **18/18**. La [evaluación pública actual](07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render) y su [resultado JSON](../eval/resultados_etapa6_render.json) corresponden al mismo despliegue. Los casos F4-01 a F4-18 anteriores permanecen como evidencia histórica del commit `84cc378` y no se sustituyen por esta síntesis.
+
 ## Prueba de configuración aislada
 
 La tarifa hipotética se comprueba localmente con `backend/tests/test_config_loader.py::test_tarifa_se_actualiza_desde_yaml_aislado` y un YAML temporal. No forma parte de los 18 casos HTTP ni modifica la configuración del servicio público.

@@ -259,3 +259,28 @@ python -m pytest backend/tests/test_ingest.py backend/tests/test_rag_service.py 
 | Abstención TP / TN / FP / FN | 4 / 16 / 0 / 0 | Clasificación en las 20 preguntas del conjunto; no prueba cobertura de consultas abiertas. |
 
 **Hallazgo pendiente:** para PREG-02 (IVA de Negocio Popular), el artículo que contiene la respuesta directa, **LRTI Art. 97.9**, queda fuera de los tres primeros resultados. El sistema cita otras disposiciones y devuelve extractos, de modo que una cita formal no asegura que la respuesta conteste la pregunta. Esta consulta requiere una mejora del ranking o una abstención por falta de fuente pertinente antes de presentar el RAG como asesoría normativa fiable. Las pruebas añadidas cubren atribución incorrecta en ingesta, coincidencias parciales de artículo, documento equivocado, exclusión de cabeceras no verificables, consulta fuera de dominio e instrucción inyectada en la pregunta. No incluyen una auditoría jurídica completa de los 1.498 fragmentos ni ataques adversarios exhaustivos.
+
+---
+
+## 10. Evaluación de la versión candidata en Render
+
+El 13 de noviembre de 2026 a las 04:36 UTC se ejecutó el evaluador 4.1.0 contra la demo pública. `/health` informó `git_commit=414bc44bfaaffaddcb62dc197db6022bed76a549` antes y después de las solicitudes; la [corrida de CI del mismo commit](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) aprobó 235 pruebas de backend, escaneo de secretos, evaluación local, compilación del frontend y construcción de Docker. El [resultado JSON de Render](../eval/resultados_etapa6_render.json) conserva el detalle sin sobrescribir las mediciones anteriores.
+
+| Medida pública | Resultado |
+| --- | ---: |
+| Perfiles completos y fechas | 10/10 y 23/23 |
+| Hit@3 por artículo completo | 15/16 (93,75 %) |
+| Citas coherentes con sus metadatos | 16/16 |
+| Par exacto documento–artículo en muestra curada | 4/5 |
+| Frase clave presente en extracto | 3/16 |
+| Abstención TP / TN / FP / FN | 4 / 16 / 0 / 0 |
+| Latencia cliente de cálculo, p50 / p95 | 184,64 / 220,86 ms |
+| Latencia cliente de RAG, p50 / p95 | 189,38 / 220,00 ms |
+
+La [batería HTTP](08-pruebas.md#verificación-de-la-versión-candidata-etapa-6) aprobó además 18/18 casos contra ese SHA. La diferencia con el Hit@3 histórico de 16/16 se debe al evaluador y al corpus actualizados; no debe presentarse como la misma medición ni como validación jurídica completa. Persiste el hallazgo PREG-02 descrito en la sección 9. Estas pruebas no miden disponibilidad prolongada, recepción de correo ni respuestas de Gemini; esas integraciones tienen evidencia separada.
+
+Para reproducir sin sobrescribir archivos históricos:
+
+```powershell
+python eval/run_eval.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output eval/resultados_reproduccion_render.json
+```

@@ -2,7 +2,7 @@
 
 Aplicación académica del Caso 11, Grupo 11, UNIANDES. Genera un calendario para contribuyentes RIMPE de Ecuador, explica obligaciones con Gemini y documentos normativos, y prepara recordatorios sujetos a consentimiento y aprobación humana.
 
-**Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). Se verificó el despliegue del commit [`84cc378`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/84cc378bac8fc1322818c24451b54f78bde86e02), [18/18 pruebas HTTP](docs/08-pruebas.md) y la [evaluación comparada](docs/07-evaluacion.md#8-comparación-de-la-semana-4). Esta instancia es de solo lectura para perfiles y no ofrece recordatorios persistentes ni envíos SMTP.
+**Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). `/health` identificó el commit [`414bc44`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/414bc44bfaaffaddcb62dc197db6022bed76a549), aprobado por [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513). Sobre ese mismo commit pasaron [18/18 pruebas HTTP](docs/08-pruebas.md) y la [evaluación actual](docs/07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render). La demo no guarda perfiles ni ejecuta el escaneo periódico; el envío puntual usa código y Mailjet.
 
 ## Problema y solución
 
@@ -67,7 +67,7 @@ Visite [http://localhost:8000](http://localhost:8000). `compose.yaml` conserva S
 
 ## Despliegue de demostración en Render Free
 
-[`render.yaml`](render.yaml) declara un único Web Service Docker con `/health`. Configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`; las credenciales de Mailjet se configuran únicamente en el panel. Tras publicar `b674bfd`, la demo pública respondió con `gemini-3.5-flash-lite`, tokens de generación y la fecha determinada por Python. Los 18 casos HTTP de regresión aprobaron. El usuario solicitó un código nuevo desde el modal, autorizó el envío y confirmó la recepción del recordatorio en Gmail.
+[`render.yaml`](render.yaml) declara un único Web Service Docker con `/health` y `autoDeployTrigger: checksPass`. Configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`; las credenciales de Mailjet se configuran únicamente en el panel. La demo respondió con `gemini-3.5-flash-lite`, tokens de generación y la fecha determinada por Python. El usuario solicitó un código desde el modal, autorizó el envío y confirmó la recepción del recordatorio en Gmail. CI comprueba secretos, pruebas, evaluación, frontend e imagen antes del despliegue automático.
 
 La instancia actual se creó mediante Blueprint y está disponible en la [URL verificada](https://calendario-rimpe-g11-demo.onrender.com/). Para reproducir el despliegue, conecte este repositorio en Render, seleccione Blueprint, revise las variables del servicio y guarde `GEMINI_API_KEY` como secreto si necesita Gemini en vivo. Publique una rama verificada, espere el build y compruebe `/health` y los [casos HTTP](docs/08-pruebas.md). La clave nunca debe entrar en Git.
 
@@ -81,7 +81,7 @@ La instancia actual se creó mediante Blueprint y está disponible en la [URL ve
 .\.venv\Scripts\python.exe scripts/production_checks.py --base-url http://localhost:8000 --output docs/08-pruebas-reproduccion-local.md
 ```
 
-La batería de 18 casos y la evaluación ya se ejecutaron contra la URL pública. Para repetirlas sin reemplazar los informes archivados:
+La batería de 18 casos y la evaluación ya se ejecutaron contra el commit `414bc44` en la URL pública. Para repetirlas sin reemplazar los informes archivados:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/production_checks.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output docs/08-pruebas-reproduccion.md
@@ -112,7 +112,7 @@ Gemini se usa para redactar explicaciones pedagógicas. Python conserva la autor
 | Cristhian Pinos | Fundamentos y arquitectura; backend tributario y Gemini; pipeline RAG, agente, evaluación y CI (`77adf34`, `adcb736`, `ffb9c3e`, `50b09db`). |
 | Juan Lucumi | SPA React y calendario; refactor con `Decimal`, integración SMTP y formulario paso a paso (`c7cec18`, `31cdbed`). |
 
-La tabla atribuye únicamente aportes respaldados por commits. Los controles de seguridad y persistencia y el empaquetado inicial de la fase 4 figuran en el commit [`84cc378`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/84cc378bac8fc1322818c24451b54f78bde86e02) de Cristhian Pinos. Las actualizaciones documentales posteriores permanecen en el árbol de trabajo hasta su publicación.
+La tabla atribuye únicamente aportes respaldados por commits. Los controles de seguridad y persistencia y el empaquetado inicial de la fase 4 figuran en el commit [`84cc378`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/84cc378bac8fc1322818c24451b54f78bde86e02) de Cristhian Pinos. Las comprobaciones posteriores de CI y Render se documentan con sus propios commits y resultados.
 
 ## Documentación
 
