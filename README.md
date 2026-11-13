@@ -2,7 +2,7 @@
 
 Aplicación académica del Caso 11, Grupo 11, UNIANDES. Genera un calendario para contribuyentes RIMPE de Ecuador, explica obligaciones con Gemini y documentos normativos, y prepara recordatorios sujetos a consentimiento y aprobación humana.
 
-**Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). `/health` identificó el commit [`414bc44`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/414bc44bfaaffaddcb62dc197db6022bed76a549), aprobado por [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513). Sobre ese mismo commit pasaron [18/18 pruebas HTTP](docs/08-pruebas.md) y la [evaluación actual](docs/07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render). La demo no guarda perfiles ni ejecuta el escaneo periódico; el envío puntual usa código y Mailjet.
+**Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). La versión funcional [`37d3c07`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/37d3c0774f76c5c2183c7ef46617fa3a4aaddb05) fue identificada por `/health`, aprobó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462), [18/18 casos HTTP](docs/08-pruebas.md#verificación-del-despliegue-con-la-corrección-rag) y la [evaluación pública posterior](docs/07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02). La demo no guarda perfiles ni ejecuta el escaneo periódico; el envío puntual usa código y Mailjet.
 
 ## Problema y solución
 
@@ -81,14 +81,14 @@ La instancia actual se creó mediante Blueprint y está disponible en la [URL ve
 .\.venv\Scripts\python.exe scripts/production_checks.py --base-url http://localhost:8000 --output docs/08-pruebas-reproduccion-local.md
 ```
 
-La batería de 18 casos y la evaluación ya se ejecutaron contra el commit `414bc44` en la URL pública. Para repetirlas sin reemplazar los informes archivados:
+La batería de 18 casos y la evaluación se repitieron contra el commit funcional `37d3c07` en la URL pública. La medición anterior de `414bc44` permanece archivada. Para repetir las pruebas sin reemplazar esos informes:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/production_checks.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output docs/08-pruebas-reproduccion.md
 .\.venv\Scripts\python.exe eval/run_eval.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output eval/resultados_reproduccion_render.json
 ```
 
-La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Para probar manualmente el formulario hay [15 casos ficticios sin correo](docs/datos-prueba-perfiles.md); no se cargan en la aplicación ni prueban inscripción real en el SRI. Los resultados de la semana 3 se conservan en [`eval/resultados_semana3.json`](eval/resultados_semana3.json). La [auditoría RAG anterior](docs/07-evaluacion.md#9-auditoría-local-del-rag-posterior-a-la-revisión-de-fuentes) registró 15/16 aciertos por artículo y 4/5 por documento y artículo en la muestra curada. La [corrección local de PREG-02](docs/07-evaluacion.md#11-corrección-local-de-la-consulta-preg-02) recupera la fuente directa y alcanza 16/16 y 5/5, respectivamente; falta comprobar esta versión en Render. La prueba de una tarifa hipotética modifica solo un YAML temporal; no altera las reglas tributarias oficiales del repositorio.
+La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Para probar manualmente el formulario hay [15 casos ficticios sin correo](docs/datos-prueba-perfiles.md); no se cargan en la aplicación ni prueban inscripción real en el SRI. Los resultados de la semana 3 se conservan en [`eval/resultados_semana3.json`](eval/resultados_semana3.json). La [auditoría RAG anterior](docs/07-evaluacion.md#9-auditoría-local-del-rag-posterior-a-la-revisión-de-fuentes) registró 15/16 aciertos por artículo y 4/5 por documento y artículo en la muestra curada. La [corrección de PREG-02 verificada en Render](docs/07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02) recupera la fuente directa y alcanza 16/16 y 5/5, respectivamente. La prueba de una tarifa hipotética modifica solo un YAML temporal; no altera las reglas tributarias oficiales del repositorio.
 
 ## Privacidad, autorización y límites
 

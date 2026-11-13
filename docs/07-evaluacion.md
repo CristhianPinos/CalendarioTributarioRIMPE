@@ -7,7 +7,7 @@
 **Versión de Evaluación:** `3.0.0`  
 **Entorno de Ejecución:** Python 3.14, FastAPI 0.110.0, Pytest 9.1.1, PyYAML, Pydantic v2  
 
-**Alcance histórico:** las secciones 1 a 8 conservan la evaluación de semanas 3 y 4 sobre el código y el dataset de entonces. Incluyen fechas de renta de Emprendedor persona natural en marzo que se corrigieron posteriormente a mayo. Sus métricas de citas indican coincidencia y formato según el evaluador anterior; no certifican pertinencia jurídica. La sección 9 documenta la auditoría RAG anterior; la sección 10 mide el commit público `414bc44` y la sección 11 recoge la corrección local posterior de PREG-02, aún sin verificar en Render.
+**Alcance histórico:** las secciones 1 a 8 conservan la evaluación de semanas 3 y 4 sobre el código y el dataset de entonces. Incluyen fechas de renta de Emprendedor persona natural en marzo que se corrigieron posteriormente a mayo. Sus métricas de citas indican coincidencia y formato según el evaluador anterior; no certifican pertinencia jurídica. La sección 9 documenta la auditoría RAG anterior; la sección 10 mide el commit público `414bc44`; la sección 11 recoge la corrección local posterior de PREG-02 y la sección 12 verifica esa corrección en el despliegue `37d3c07`.
 
 ---
 
@@ -291,4 +291,23 @@ python eval/run_eval.py --base-url https://calendario-rimpe-g11-demo.onrender.co
 
 La [LRTI, art. 97.9](https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/12c884d5-c8d9-4171-becc-1513b990b87a/LEY_DE_REGIMEN_TRIBUTARIO_INTERNO_LRTI.pdf) contiene la frase directa «Los negocios populares no presentarán declaraciones de IVA». El artículo ya estaba en el índice, pero BM25 lo relegaba frente a disposiciones generales donde se repiten «IVA» y «RIMPE». Para preguntas sobre declaraciones de IVA de Negocio Popular se prioriza ese fragmento solo si pasó los filtros de vigencia y régimen, conserva la frase verificada y su pasaje coincide con la consulta; así se cubren también variantes como «declarar IVA» sin cambiar el ranking general. La respuesta muestra la oración pertinente y advierte que las actividades excluidas deben revisarse por separado. Esta mejora no altera el cálculo tributario ni interpreta otras obligaciones.
 
-Se corrigió además la frase de referencia de PREG-02 en el dataset para que coincida con el texto de la ley. La [evaluación local posterior](../eval/resultados_preg02_local.json) obtuvo 10/10 perfiles, 23/23 fechas, Hit@3 de 16/16, citas coherentes 16/16, fuente y artículo 5/5, frase clave 4/16 y abstención TP/TN/FP/FN de 4/16/0/0. Los 14 controles específicos del RAG aprobaron. Las cifras de las secciones anteriores corresponden a versiones históricas y no se reescriben. Esta medición local no verifica aún el cambio en Render ni constituye una auditoría jurídica completa de todas las respuestas.
+Se corrigió además la frase de referencia de PREG-02 en el dataset para que coincida con el texto de la ley. La [evaluación local posterior](../eval/resultados_preg02_local.json) obtuvo 10/10 perfiles, 23/23 fechas, Hit@3 de 16/16, citas coherentes 16/16, fuente y artículo 5/5, frase clave 4/16 y abstención TP/TN/FP/FN de 4/16/0/0. Los 14 controles específicos del RAG aprobaron. Las cifras de las secciones anteriores corresponden a versiones históricas y no se reescriben. La medición local por sí sola no constituía una verificación en Render ni una auditoría jurídica completa de todas las respuestas.
+
+---
+
+## 12. Verificación pública de la corrección PREG-02
+
+El 13 de noviembre de 2026 a las 22:26 UTC se repitió el evaluador 4.1.0 contra la demo pública. `/health` identificó el commit `37d3c0774f76c5c2183c7ef46617fa3a4aaddb05` antes y después de las pruebas. La [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462) de ese mismo commit aprobó. El [resultado JSON](../eval/resultados_37d3c07_render.json) conserva la medición separada de las anteriores.
+
+| Medida pública | Resultado |
+| --- | ---: |
+| Perfiles completos y fechas | 10/10 y 23/23 |
+| Hit@3 por artículo completo | 16/16 |
+| Citas coherentes con sus metadatos | 16/16 |
+| Par exacto documento–artículo en muestra curada | 5/5 |
+| Frase clave presente en extracto | 4/16 |
+| Abstención TP / TN / FP / FN | 4 / 16 / 0 / 0 |
+| Latencia cliente de cálculo, p50 / p95 | 194,25 / 215,75 ms |
+| Latencia cliente de RAG, p50 / p95 | 199,48 / 238,45 ms |
+
+PREG-02 recuperó la fuente directa entre los tres primeros resultados. La [batería HTTP](08-pruebas.md#verificación-del-despliegue-con-la-corrección-rag) aprobó 18/18 casos sobre el mismo despliegue. El indicador de frase clave es estricto y depende del recorte del extracto; las cifras no sustituyen una revisión jurídica de todas las respuestas ni miden disponibilidad prolongada, recepción de correo o respuestas de Gemini.

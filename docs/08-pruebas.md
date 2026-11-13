@@ -404,7 +404,11 @@ El commit `b674bfd` publicó Flash Lite y la protección de la fecha. En la nuev
 
 ## Verificación de la versión candidata: etapa 6
 
-La [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) del commit `414bc44bfaaffaddcb62dc197db6022bed76a549` terminó satisfactoriamente: escaneo de secretos, 235 pruebas de backend, evaluación local, compilación React y construcción Docker. `/health` informó ese mismo SHA antes y después de las pruebas públicas. `scripts/production_checks.py` ejecutó de nuevo los 18 casos HTTP con perfiles sintéticos y aprobó **18/18**. La [evaluación pública actual](07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render) y su [resultado JSON](../eval/resultados_etapa6_render.json) corresponden al mismo despliegue. Los casos F4-01 a F4-18 anteriores permanecen como evidencia histórica del commit `84cc378` y no se sustituyen por esta síntesis.
+La [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) del commit `414bc44bfaaffaddcb62dc197db6022bed76a549` terminó satisfactoriamente: escaneo de secretos, 235 pruebas de backend, evaluación local, compilación React y construcción Docker. `/health` informó ese mismo SHA antes y después de las pruebas públicas. `scripts/production_checks.py` ejecutó de nuevo los 18 casos HTTP con perfiles sintéticos y aprobó **18/18**. La [evaluación pública de ese commit](07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render) y su [resultado JSON](../eval/resultados_etapa6_render.json) corresponden al mismo despliegue. Los casos F4-01 a F4-18 anteriores permanecen como evidencia histórica del commit `84cc378` y no se sustituyen por esta síntesis.
+
+## Verificación del despliegue con la corrección RAG
+
+El 13 de noviembre de 2026 a las 22:26 UTC, `/health` identificó `37d3c0774f76c5c2183c7ef46617fa3a4aaddb05` antes y después de repetir `scripts/production_checks.py` con datos sintéticos: **18/18 casos HTTP aprobados**. El commit pasó la [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462). La [evaluación pública posterior](07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02) y su [resultado JSON](../eval/resultados_37d3c07_render.json) verifican PREG-02 sobre ese mismo SHA. Esta repetición no prueba por sí sola el diseño visual en todos los dispositivos ni la entrega de correo.
 
 ## Prueba de configuración aislada
 
