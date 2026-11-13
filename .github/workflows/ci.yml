@@ -9,10 +9,19 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Clonar repositorio
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detectar secretos en el historial de Git
+      uses: gitleaks/gitleaks-action@v3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Configurar Python 3.12
       uses: actions/setup-python@v5
