@@ -1,6 +1,6 @@
 # Pruebas funcionales de la fase 4
 
-> Evidencia local histórica previa al flujo público de correo verificado. Las menciones a SMTP, operador y cola se refieren al diseño de aquella versión; el envío puntual vigente usa código temporal, confirmación y Mailjet HTTPS. Véase [pruebas públicas posteriores](08-pruebas.md#seguimiento-de-gemini-y-correo-etapa-5).
+> Evidencia local histórica previa al flujo público de correo verificado. Las menciones a SMTP, operador y cola se refieren al diseño de aquella versión; el envío puntual vigente usa código temporal, confirmación y Mailjet HTTPS. Véase [pruebas públicas posteriores](08-pruebas.md#seguimiento-de-gemini-y-correo).
 
 - Fecha UTC: 2026-11-08T01:06:27.983461+00:00
 - Entorno: local

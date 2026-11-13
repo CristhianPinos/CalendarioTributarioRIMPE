@@ -277,7 +277,7 @@ El 13 de noviembre de 2026 a las 04:36 UTC se ejecutó el evaluador 4.1.0 contra
 | Latencia cliente de cálculo, p50 / p95 | 184,64 / 220,86 ms |
 | Latencia cliente de RAG, p50 / p95 | 189,38 / 220,00 ms |
 
-La [batería HTTP](08-pruebas.md#verificación-de-la-versión-candidata-etapa-6) aprobó además 18/18 casos contra ese SHA. La diferencia con el Hit@3 histórico de 16/16 se debe al evaluador y al corpus actualizados; no debe presentarse como la misma medición ni como validación jurídica completa. Persiste el hallazgo PREG-02 descrito en la sección 9. Estas pruebas no miden disponibilidad prolongada, recepción de correo ni respuestas de Gemini; esas integraciones tienen evidencia separada.
+La [batería HTTP](08-pruebas.md#verificación-de-la-versión-candidata) aprobó además 18/18 casos contra ese SHA. La diferencia con el Hit@3 histórico de 16/16 se debe al evaluador y al corpus actualizados; no debe presentarse como la misma medición ni como validación jurídica completa. Persiste el hallazgo PREG-02 descrito en la sección 9. Estas pruebas no miden disponibilidad prolongada, recepción de correo ni respuestas de Gemini; esas integraciones tienen evidencia separada.
 
 Para reproducir sin sobrescribir archivos históricos:
 

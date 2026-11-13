@@ -392,7 +392,7 @@ Content-Type: application/json
 
 El primer intento agotó el límite de 90 s del cliente. Con la instancia activa, el segundo terminó en 54 338 ms y devolvió `modelo_utilizado=fallback-determinista-sri`, `tokens_utilizados=0` y `codigo_obligacion=IVA_SEMESTRAL_1`. `/health` seguía respondiendo `healthy` y marcaba la clave Gemini como configurada. Los [logs de aplicación de Render](https://dashboard.render.com/web/srv-dbnt8grrjlhs739qboog/logs?t=app&r=1h) registraron para el segundo intento un timeout de 25 s, HTTP 503 del proveedor, otro timeout de 25 s y la activación de la contingencia por `ReadTimeout`; la ruta terminó con HTTP 200 en 54 019,06 ms del servidor. Esta prueba histórica validó la contingencia, pero no Gemini en vivo. La comprobación posterior con Flash Lite figura en la sección siguiente.
 
-## Seguimiento de Gemini y correo: etapa 5
+## Seguimiento de Gemini y correo
 
 Esta comprobación es posterior a F4-01 a F4-18 y no altera su resultado histórico. El servicio público, en el commit `2444cb3` y la versión `3.3.0`, respondió a una consulta sintética de IVA con HTTP 200, `modelo_utilizado=fallback-determinista-sri` y cero tokens en 7,16 s. Los logs de Render del 13 de noviembre de 2026 a las 03:43 UTC muestran respuestas HTTP 429, 503 y 429 del proveedor antes de agotar los reintentos. Otras consultas de la misma sesión registraron 429 y `ReadTimeout` de 8 s. El estado `/health` confirmó que la clave estaba configurada; no demuestra disponibilidad de cuota ni que Gemini haya generado la respuesta.
 
@@ -402,7 +402,7 @@ En Render, una solicitud de código al correo institucional de prueba recibió H
 
 El commit `b674bfd` publicó Flash Lite y la protección de la fecha. En la nueva versión, una consulta pública sintética de `IVA_SEMESTRAL_1` devolvió HTTP 200, `modelo_utilizado=gemini-3.5-flash-lite`, 1461 tokens, código correcto, fecha `Jueves 16 de julio de 2026`, explicación y sugerencia presentes. Una ejecución pública del agente con un perfil ficticio y `confirmacion_envio=false` registró tres herramientas (`calcular_vencimientos`, `redactar_recordatorio`, `enviar_recordatorio`), las tres con origen `gemini`, y terminó en `PENDIENTE_CONFIRMACION` sin enviar correo. La batería de regresión HTTP volvió a aprobar 18/18 casos contra este despliegue. La recepción del recordatorio autorizado fue confirmada por el usuario en el flujo real del modal. La prueba de un caso no garantiza que Gemini mantenga cuota o disponibilidad en futuras consultas.
 
-## Verificación de la versión candidata: etapa 6
+## Verificación de la versión candidata
 
 La [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) del commit `414bc44bfaaffaddcb62dc197db6022bed76a549` terminó satisfactoriamente: escaneo de secretos, 235 pruebas de backend, evaluación local, compilación React y construcción Docker. `/health` informó ese mismo SHA antes y después de las pruebas públicas. `scripts/production_checks.py` ejecutó de nuevo los 18 casos HTTP con perfiles sintéticos y aprobó **18/18**. La [evaluación pública de ese commit](07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render) y su [resultado JSON](../eval/resultados_etapa6_render.json) corresponden al mismo despliegue. Los casos F4-01 a F4-18 anteriores permanecen como evidencia histórica del commit `84cc378` y no se sustituyen por esta síntesis.
 
