@@ -137,6 +137,7 @@ def health_check():
         "status": "healthy" if config_ok else "degraded",
         "service": "backend-fastapi",
         "version": APP_VERSION,
+        "git_commit": os.getenv("RENDER_GIT_COMMIT"),
         "demo_readonly": os.getenv("RIMPE_DEMO_READONLY", "false").lower() in ("1", "true", "yes"),
         "checks": {
             "sri_rules_config": config_ok,

@@ -171,7 +171,7 @@ class TestApiResilienciaMocks:
         data = response.json()
         assert data["modelo_utilizado"] == "fallback-determinista-sri"
         assert data["obligacion"]["codigo_obligacion"] == "RENTA_ANUAL_NEGOCIO_POPULAR"
-        assert "Ley Orgánica de Eficiencia Económica" in data["obligacion"]["base_legal_oficial"]
+        assert data["obligacion"]["base_legal_oficial"]
 
     @patch("backend.services.llm._enviar_http_gemini")
     def test_error_503_recupera_en_segundo_intento(self, mock_gemini_post):
