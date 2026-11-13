@@ -410,6 +410,12 @@ La [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/a
 
 El 13 de noviembre de 2026 a las 22:26 UTC, `/health` identificó `37d3c0774f76c5c2183c7ef46617fa3a4aaddb05` antes y después de repetir `scripts/production_checks.py` con datos sintéticos: **18/18 casos HTTP aprobados**. El commit pasó la [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462). La [evaluación pública posterior](07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02) y su [resultado JSON](../eval/resultados_37d3c07_render.json) verifican PREG-02 sobre ese mismo SHA. Esta repetición no prueba por sí sola el diseño visual en todos los dispositivos ni la entrega de correo.
 
+## Comprobación visual del despliegue responsive
+
+Se abrió la demo pública con un RUC sintético, RIMPE Emprendedor y ejercicio 2026. En escritorio (1366 px), tableta (768 px) y móvil (390 px) se comprobó el formulario, el resumen del perfil, el calendario, los próximos vencimientos y el modal. En móvil, el desplazamiento horizontal mostró el evento completo sin cortar su texto, y el cuerpo del modal permitió llegar a los controles de autorización. La explicación visible en esta revisión indicó `gemini-3.5-flash-lite`; esto comprueba una respuesta puntual, no disponibilidad futura.
+
+La revisión adicional a 320 px descubrió un desbordamiento horizontal de 5 px en los botones de navegación y una cabecera del modal demasiado próxima al cierre. El ajuste `30fab3593f5c352da9a653f40adf536895dfc0f4` permite que esos botones salten de línea y reserva espacio para el cierre. Tras [CI aprobado](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43521418406), `/health` informó el nuevo SHA y la comprobación pública mostró `documentWidth=305` con `innerWidth=320`, navegación sin corte y formulario legible en el modal. No se repitieron los casos HTTP ni el correo después de este cambio visual; las mediciones anteriores pertenecen a `37d3c07`.
+
 ## Prueba de configuración aislada
 
 La tarifa hipotética se comprueba localmente con `backend/tests/test_config_loader.py::test_tarifa_se_actualiza_desde_yaml_aislado` y un YAML temporal. No forma parte de los 18 casos HTTP ni modifica la configuración del servicio público.

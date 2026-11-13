@@ -4,6 +4,8 @@ Aplicación académica del Caso 11, Grupo 11, UNIANDES. Genera un calendario par
 
 **Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). La versión funcional [`37d3c07`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/37d3c0774f76c5c2183c7ef46617fa3a4aaddb05) fue identificada por `/health`, aprobó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462), [18/18 casos HTTP](docs/08-pruebas.md#verificación-del-despliegue-con-la-corrección-rag) y la [evaluación pública posterior](docs/07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02). La demo no guarda perfiles ni ejecuta el escaneo periódico; el envío puntual usa código y Mailjet.
 
+El ajuste visual posterior [`30fab35`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/30fab3593f5c352da9a653f40adf536895dfc0f4) pasó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43521418406) y se revisó en la URL pública en escritorio, tableta y móviles de 390 y 320 px. Véase la [comprobación visual](docs/08-pruebas.md#comprobación-visual-del-despliegue-responsive).
+
 ## Problema y solución
 
 Los vencimientos dependen del noveno dígito del RUC, el régimen, el período y los días inhábiles. Una fecha incorrecta puede inducir a incumplimiento. El motor Python calcula fechas y montos a partir de [`config/`](config/). Gemini redacta explicaciones; el RAG aporta citas de los documentos procesados. El envío puntual requiere confirmar la acción y verificar el correo destinatario con un código temporal.
