@@ -216,14 +216,14 @@ export default function ExplanationModal({
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center space-x-2 mb-2">
+          <div className="flex flex-wrap items-center gap-1.5 pr-12 mb-2">
             <span
               className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full text-white"
               style={{ backgroundColor: obligacion.color_identificador }}
             >
               {obligacion.categoria}
             </span>
-            <span className="text-xs text-blue-200">
+            <span className="min-w-0 text-xs text-blue-200">
               Formulario: <strong>{obligacion.formulario_sri}</strong>
             </span>
           </div>

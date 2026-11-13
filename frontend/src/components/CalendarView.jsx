@@ -249,7 +249,7 @@ export default function CalendarView({
           <div className="bg-gradient-to-r from-slate-50 via-blue-50/40 to-slate-50 p-4 rounded-2xl border border-slate-200">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               {/* Botones Avanzar / Retroceder y Hoy */}
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handlePrev}
