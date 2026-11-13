@@ -6,11 +6,15 @@
 
 **Periodo:** Noviembre de 2026 / Fase 4 – Semana 4
 
-**Estado:** Despliegue de demostración verificado; cierre de fase pendiente.
+**Integrantes:** Juan Lucumi (Desarrollador A) y Cristhian Pinos (Desarrollador B)
+
+**Estado:** Demostración y CI verificados; entrega formal pendiente.
 
 ---
 
 ## 1. Decisiones Técnicas de la Semana 4
+
+La [bitácora](bitacora-semana-4.md#2-observaciones-de-la-revisión-y-respuesta-del-proyecto) reúne las observaciones recibidas y las mejoras aplicadas. El equipo confirmó que los comentarios de la revisión coinciden en lo esencial con el informe escrito; aquí se justifican las decisiones técnicas derivadas de ellos.
 
 ### Render Free como demostración
 
@@ -30,10 +34,22 @@ Las decisiones éticas se describen en [ADR-008 a ADR-012](../../09-decisiones.m
 
 ### Selección acotada de herramientas
 
-El agente puede consultar a Gemini para elegir entre herramientas habilitadas por Python. La decisión se valida y se traza; ante fallos se conserva el recorrido seguro. El flujo de correo verificado permanece determinista después de consumir el código temporal. [ADR-012](../../09-decisiones.md) explica la separación y la cuota compartida.
+La observación de que el agente seguía un orden fijo llevó a permitir que Gemini elija solo entre herramientas habilitadas por Python. La decisión se valida y se traza; ante fallos se conserva el recorrido seguro. El flujo de correo verificado permanece determinista después de consumir el código temporal. [ADR-012](../../09-decisiones.md) explica la separación y la cuota compartida.
+
+### Protección de cuota y del contenido del correo
+
+La revisión señaló la falta de un límite de tasa para las rutas de IA y el riesgo de insertar texto variable sin escape en el HTML del correo. Se añadieron contadores por cliente e instancia con `429` y `Retry-After`, se limitaron las entradas y los tokens, y se escapó el texto del mensaje. Los contadores se reinician con el proceso: escalar a varias instancias requeriría un almacén compartido. El destinatario sigue verificándose con un código y el despacho requiere confirmación expresa.
+
+### CI antes del despliegue y evidencia por commit
+
+`render.yaml` declara `autoDeployTrigger: checksPass`. Se añadió detección de secretos al flujo que ya ejecutaba pruebas, evaluación, frontend y Docker. Una prueba obsoleta bloqueó la primera corrida y se corrigió sin modificar las reglas tributarias. `/health` expone el SHA de Render para comprobar que la evaluación pública y la corrida verde corresponden al mismo código. El commit documental de cierre usó `[skip render]` para conservar desplegado el SHA evaluado.
+
+### Explicaciones con contingencia y límites del RAG
+
+Ante respuestas 429/503 de Gemini se conserva el catálogo determinista y se informa su origen. Flash Lite produjo una respuesta real en la demo, pero su disponibilidad futura no está garantizada. El RAG distingue cita formal de fuente pertinente. Para PREG-02 se decidió priorizar, solo en consultas de declaraciones de IVA de Negocio Popular, el fragmento verificado de LRTI art. 97.9 que ya supera los filtros de recuperación; también se muestra su oración pertinente y se advierte sobre actividades excluidas. La [evaluación local](../../07-evaluacion.md#11-corrección-local-de-la-consulta-preg-02) aprobó y falta comprobar esta revisión en Render. Estas decisiones no cambian las fechas ni los montos calculados por Python.
 
 ---
 
 ## 2. Estado de las Decisiones en el Despliegue
 
-El servicio Free se verificó en estado `Live` con el commit `84cc378`; `/health` confirmó el modo de solo lectura y el planificador deshabilitado. La [bitácora de la semana 4](bitacora-semana-4.md) resume el trabajo, las validaciones y sus límites; las fechas y resultados completos permanecen en los informes enlazados. Esta verificación no implica que la persistencia ni los envíos de recordatorios estén habilitados en la demostración.
+La primera demostración se verificó con el commit `84cc378`. La versión candidata posterior se comprobó con el commit `414bc44`: `/health` informó ese SHA antes y después de 18/18 casos HTTP y de la evaluación pública; la [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) aprobó sus controles. El usuario confirmó la recepción del código y del recordatorio del flujo puntual. El registro de perfiles y el escaneo periódico siguen desactivados en Render Free. La [bitácora](bitacora-semana-4.md) y los informes enlazados conservan los resultados y sus límites.

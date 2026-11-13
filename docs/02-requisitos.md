@@ -1,5 +1,7 @@
 # Especificación de Requisitos y Modelo de Datos
 
+> **Línea base histórica de fase 1.** Los requisitos de perfil con correo, autorización de operador, cola persistente, SMTP y escaneo periódico no describen el flujo público actual. El calendario utiliza un perfil de sesión sin correo guardado; el recordatorio puntual verifica el destinatario con un código y se envía por Mailjet HTTPS tras confirmación humana. La implementación histórica de persistencia y planificador sigue sin rutas montadas. Véanse [arquitectura vigente](03-arquitectura.md#arquitectura-vigente) y [ADR-010/011](09-decisiones.md).
+
 | Metadato | Detalle |
 | :--- | :--- |
 | **Documento** | Especificación Formal de Requisitos del Software y Modelo de Datos |

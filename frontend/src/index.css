@@ -117,8 +117,11 @@
   overflow-x: auto;
 }
 
-.calendar-container .fc {
-  min-width: 700px;
+/* FullCalendar v7 usa clases generadas; su raíz es el hijo directo del contenedor. */
+@media (max-width: 639px) {
+  .calendar-container > div {
+    min-width: 700px;
+  }
 }
 
 .calendar-container .fc-daygrid-event,

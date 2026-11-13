@@ -130,9 +130,9 @@ export default function ProfileForm({ onGenerarCalendario, cargando, errorBacken
                   >
                     {completado ? <Check className="w-3 h-3 stroke-[3]" /> : paso.id}
                   </div>
-                  <div className="hidden sm:block">
-                    <p className="text-[11px] font-bold leading-none">{paso.titulo}</p>
-                    <p className="text-[9px] opacity-75 leading-tight">{paso.subtitulo}</p>
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-[11px] font-bold leading-tight truncate">{paso.titulo}</p>
+                    <p className="hidden sm:block text-[9px] opacity-75 leading-tight">{paso.subtitulo}</p>
                   </div>
                 </div>
               </button>

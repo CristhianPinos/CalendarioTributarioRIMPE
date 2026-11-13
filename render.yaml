@@ -1,4 +1,5 @@
-# Demostración pública sin persistencia de perfiles ni envío de correo.
+# Demostración pública sin persistencia de perfiles ni escaneo periódico.
+# El envío puntual usa Mailjet; sus claves se configuran como secretos en el panel.
 # Render Free pierde cambios locales al suspenderse o reiniciarse.
 services:
   - type: web

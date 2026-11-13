@@ -1,5 +1,7 @@
 # Pruebas funcionales de la fase 4
 
+> Los casos F4-01 a F4-18 que siguen son la evidencia histórica del primer despliegue. Las secciones «Seguimiento de Gemini y correo» y «Verificación de la versión candidata» describen commits posteriores. El transporte SMTP de los casos antiguos fue reemplazado por Mailjet HTTPS para el envío puntual.
+
 - Fecha UTC: 2026-11-09T22:35:55.532211+00:00
 - Entorno: despliegue público
 - URL: https://calendario-rimpe-g11-demo.onrender.com
@@ -410,4 +412,4 @@ La tarifa hipotética se comprueba localmente con `backend/tests/test_config_loa
 
 ## Alcance de la compuerta HITL
 
-F4-14 comprueba la respuesta de la herramienta individual. En el código del commit desplegado, la rama sin confirmación retorna antes de SMTP y no añade una fila a la cola. La cola se crea mediante el escaneo periódico o la ruta manual autorizada; F4-14 no prueba esos flujos.
+F4-14 comprueba la respuesta de la herramienta individual en el commit histórico `84cc378`: sin confirmación no llegaba al despacho SMTP ni añadía una fila a la cola. En el flujo público posterior, el correo puntual usa Mailjet HTTPS y exige código temporal y confirmación. Las rutas históricas de cola y escaneo periódico ya no están montadas. F4-14 no prueba la entrega real; la recepción del código y del recordatorio en la demo se documenta arriba.

@@ -45,6 +45,31 @@ def test_rag_respuesta_con_cita_obligatoria():
         assert c.articulo_seccion != ""
 
 
+def test_iva_negocio_popular_cita_la_regla_directa_sin_extracto_contradictorio():
+    pregunta = "Soy RIMPE negocio popular, ¿tengo que presentar declaraciones de IVA?"
+    recuperados = _MOTOR_RAG_GLOBAL.recuperar(
+        pregunta, regimen="RIMPE_NEGOCIO_POPULAR", top_k=3
+    )
+    assert recuperados[0][0]["documento"] == "Ley de Régimen Tributario Interno (LRTI)"
+    assert recuperados[0][0]["articulo_seccion"] == "Art. 97.9"
+
+    respuesta = responder_con_rag(pregunta, regimen="RIMPE_NEGOCIO_POPULAR")
+    assert respuesta.se_abstuvo is False
+    assert "Los negocios populares no presentarán declaraciones de IVA." in respuesta.respuesta
+    assert "actividades excluidas" in respuesta.respuesta
+    assert "presentarán la respectiva declaración" not in respuesta.respuesta
+    assert any(
+        cita.documento == "Ley de Régimen Tributario Interno (LRTI)"
+        and cita.articulo_seccion == "Art. 97.9"
+        for cita in respuesta.citas
+    )
+
+    variante = responder_con_rag(
+        "¿Un negocio popular RIMPE debe declarar IVA?", regimen="RIMPE_NEGOCIO_POPULAR"
+    )
+    assert "Los negocios populares no presentarán declaraciones de IVA." in variante.respuesta
+
+
 def test_rag_prefiltrado_por_regimen():
     """
     Verifica que al filtrar por RIMPE_NEGOCIO_POPULAR no se recuperen normas

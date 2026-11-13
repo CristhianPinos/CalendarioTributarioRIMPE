@@ -2,7 +2,7 @@
 
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE  
 **Fase 2:** Construcción del MVP e integración con IA generativa (Semana 2)  
-**Modelo de Inferencia:** Google Gemini Flash (`gemini-3-flash-preview` / `gemini-3.8-flash`)  
+**Modelo de inferencia de la comparación histórica:** Google Gemini Flash (`gemini-3-flash-preview` / `gemini-3.8-flash`). El despliegue verificado de fase 4 usa `gemini-3.5-flash-lite` y conserva contingencia determinista.
 **Esquema de Validación:** `RecordatorioEstructurado` (Pydantic v2)  
 
 ---

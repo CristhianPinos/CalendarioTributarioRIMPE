@@ -2,14 +2,14 @@
 
 **Proyecto:** Calendario Tributario RIMPE, Caso N.º 11 – Grupo 11  
 **Integrantes:** Juan Lucumi (Desarrollador A) y Cristhian Pinos (Desarrollador B)  
-**Estado:** documentación del código local al 12 de noviembre de 2026; la versión pública de Render puede diferir.
+**Estado:** documentación del cierre de fase 4; las correcciones locales posteriores al commit público `414bc44` se distinguen de las pruebas realizadas en Render.
 
 ## Uso en la aplicación
 
 - **Gemini** está integrado para redactar explicaciones pedagógicas de obligaciones y, en la ruta de demostración del agente, proponer la siguiente herramienta entre las que Python habilita. El backend valida la selección y limita los pasos. Las fechas, montos y obligaciones provienen del cálculo determinista en Python, no del modelo.
 - **RAG** recupera extractos de siete PDF normativos locales mediante BM25 y adjunta citas estructuradas. Una cita presente no demuestra que la fuente responda la pregunta: la [auditoría local](07-evaluacion.md#9-auditoría-local-del-rag-posterior-a-la-revisión-de-fuentes) identificó una consulta de IVA sin la fuente directa entre los tres primeros resultados.
 - **Contingencia:** si Gemini no responde, el modal usa el catálogo `fallback-determinista-sri` y muestra su origen. El commit anterior `2444cb3` activó este modo ante 429/503 de Google. Con `b674bfd`, `gemini-3.5-flash-lite` produjo una explicación estructurada y seleccionó herramientas permitidas en Render con datos ficticios. Una respuesta satisfactoria no garantiza disponibilidad futura.
-- **Correo:** el envío puntual requiere que la persona confirme la acción y pruebe acceso al correo destinatario mediante un código. El recorrido de herramientas de este envío usa selección segura de Python, aunque la interfaz muestre una bitácora ReAct. La aceptación por Mailjet no demuestra entrega final; el usuario confirmó recepción en pruebas locales.
+- **Correo:** el envío puntual requiere que la persona confirme la acción y pruebe acceso al correo destinatario mediante un código. El recorrido de herramientas de este envío usa selección segura de Python, aunque la interfaz muestre una bitácora ReAct. SMTP se sustituyó por Mailjet HTTPS para este flujo. La aceptación por Mailjet no demuestra entrega final; el usuario confirmó recepción del código y del recordatorio tanto en pruebas locales como en la demostración pública.
 
 ## Uso de IA durante el desarrollo
 

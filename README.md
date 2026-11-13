@@ -63,7 +63,7 @@ Con Docker Engine activo y `.env` creado:
 docker compose up --build
 ```
 
-Visite [http://localhost:8000](http://localhost:8000). `compose.yaml` conserva SQLite en el volumen `rimpe-data`. La imagen compila React, sirve frontend y API desde el mismo origen, escucha `${PORT}` y ejecuta Uvicorn con un usuario sin privilegios. No incluye `.env`, la cola JSON histórica ni datos personales. Para restaurar un respaldo SQLite, detenga la aplicación y copie una base validada al volumen antes de iniciar de nuevo. Proteja el volumen y cualquier respaldo con permisos de acceso adecuados.
+Visite [http://localhost:8000](http://localhost:8000). `compose.yaml` define el volumen `rimpe-data` para la implementación SQLite histórica, pero la aplicación actual no monta las rutas de perfiles ni cola y no escribe ahí el perfil del formulario. La imagen compila React, sirve frontend y API desde el mismo origen, escucha `${PORT}` y ejecuta Uvicorn con un usuario sin privilegios. No incluye `.env`, la cola JSON histórica ni datos personales. Si en otra instalación se reactiva la persistencia, proteja el volumen y los respaldos, y restaure una base validada con la aplicación detenida.
 
 ## Despliegue de demostración en Render Free
 
@@ -88,7 +88,7 @@ La batería de 18 casos y la evaluación ya se ejecutaron contra el commit `414b
 .\.venv\Scripts\python.exe eval/run_eval.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output eval/resultados_reproduccion_render.json
 ```
 
-La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Para probar manualmente el formulario hay [15 casos ficticios sin correo](docs/datos-prueba-perfiles.md); no se cargan en la aplicación ni prueban inscripción real en el SRI. Los resultados de la semana 3 se conservan en [`eval/resultados_semana3.json`](eval/resultados_semana3.json). La [auditoría RAG local](docs/07-evaluacion.md#9-auditoría-local-del-rag-posterior-a-la-revisión-de-fuentes) distingue presencia de cita y fuente pertinente: 15/16 aciertos por artículo y 4/5 por documento y artículo en la muestra curada. La consulta sobre IVA de Negocio Popular sigue sin recuperar la fuente directa entre las tres primeras. La prueba de una tarifa hipotética modifica solo un YAML temporal; no altera las reglas tributarias oficiales del repositorio.
+La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Para probar manualmente el formulario hay [15 casos ficticios sin correo](docs/datos-prueba-perfiles.md); no se cargan en la aplicación ni prueban inscripción real en el SRI. Los resultados de la semana 3 se conservan en [`eval/resultados_semana3.json`](eval/resultados_semana3.json). La [auditoría RAG anterior](docs/07-evaluacion.md#9-auditoría-local-del-rag-posterior-a-la-revisión-de-fuentes) registró 15/16 aciertos por artículo y 4/5 por documento y artículo en la muestra curada. La [corrección local de PREG-02](docs/07-evaluacion.md#11-corrección-local-de-la-consulta-preg-02) recupera la fuente directa y alcanza 16/16 y 5/5, respectivamente; falta comprobar esta versión en Render. La prueba de una tarifa hipotética modifica solo un YAML temporal; no altera las reglas tributarias oficiales del repositorio.
 
 ## Privacidad, autorización y límites
 
@@ -101,7 +101,7 @@ La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Para
 
 ## Uso ético de IA generativa
 
-La [declaración de uso de IA](docs/declaracion-uso-ia.md) identifica las funciones de Gemini, el papel del RAG y de Python, la asistencia de IA durante el desarrollo y los límites verificados. El [seguimiento de observaciones](docs/evidencias/semana-4/observaciones-revision.md) distingue lo publicado, lo probado solo en local y lo pendiente.
+La [declaración de uso de IA](docs/declaracion-uso-ia.md) identifica las funciones de Gemini, el papel del RAG y de Python, la asistencia de IA durante el desarrollo y los límites verificados. La [bitácora de semana 4](docs/evidencias/semana-4/bitacora-semana-4.md#2-observaciones-de-la-revisión-y-respuesta-del-proyecto) responde a las observaciones de la revisión y distingue los resultados históricos de los actuales; las [decisiones de la semana](docs/evidencias/semana-4/decisiones-semana-4.md) explican las soluciones elegidas.
 
 Gemini se usa para redactar explicaciones pedagógicas. Python conserva la autoridad sobre cálculos y fechas. El RAG exige citas o se abstiene; las consultas orientadas a evasión reciben rechazo. El agente no autoriza envíos por sí mismo. Los resultados pueden contener errores de interpretación y requieren contraste con las fuentes oficiales.
 
@@ -123,4 +123,4 @@ La tabla atribuye únicamente aportes respaldados por commits. Los controles de 
 - [Decisiones técnicas](docs/09-decisiones.md)
 - [Automatización y respaldos](docs/10-automatizacion.md)
 - [Riesgos](docs/riesgos.md)
-- [Presentación de sustentación en PDF](docs/sustentacion-grupo11.pdf) y [guion de 12 minutos](docs/guion-sustentacion.md)
+- [Presentación de sustentación en PDF](docs/sustentacion-grupo11.pdf)

@@ -1,6 +1,6 @@
 # Documento de Arquitectura de Software: Calendario Tributario Inteligente RIMPE
 
-> **Nota de versión:** los diagramas de este documento describen el diseño de la fase 2. El flujo puntual local actual no monta la cola ni el planificador y utiliza la API HTTPS de Mailjet en lugar de SMTP; véanse ADR-010 y ADR-011 en `docs/09-decisiones.md`.
+> **Estado al cierre de fase 4:** la sección «Arquitectura vigente» describe el código actual. Las secciones 1 a 5 conservan el diseño de la fase 2 como antecedente; sus diagramas de SMTP, operador, perfil persistido, planificador y rutas de notificaciones no representan la aplicación en ejecución. Véanse [ADR-010 y ADR-011](09-decisiones.md).
 
 | Metadato | Detalle |
 | :--- | :--- |
@@ -10,6 +10,27 @@
 | **Enfoque Arquitectónico** | Arquitectura Híbrida (Motor Determinista + Agente RAG con Salida Estructurada + Compuerta HITL) |
 | **Fecha** | Octubre 2026 / Actualizado Fase 2 |
 | **Versión** | 2.0.0 |
+
+---
+
+## Arquitectura vigente
+
+```mermaid
+flowchart LR
+    UI[React / FullCalendar / simulador] --> API[FastAPI]
+    API --> CALC[Reglas y cálculo Python]
+    API --> RAG[BM25 sobre siete PDF]
+    API --> IA[Gemini o catálogo de contingencia]
+    UI --> OTP[Código al correo elegido]
+    OTP --> HITL[Confirmación humana]
+    HITL --> MJ[Mailjet API HTTPS]
+```
+
+- El contribuyente introduce RUC, régimen, nombre y ejercicio en tres pasos. `POST /api/perfil/calcular-vencimientos` calcula el calendario en Python; el perfil solo vive en la sesión de la interfaz. El correo se solicita al abrir un vencimiento, nunca en el formulario del perfil.
+- `POST /api/obligaciones/explicar` combina datos tributarios calculados, contexto normativo y Gemini cuando responde. Si falla o no hay clave, entrega el catálogo determinista con el origen identificado. El simulador también delega montos a Python.
+- Las rutas `/api/correo` envían un código temporal al destinatario y requieren su verificación y confirmación expresa para el recordatorio puntual. Mailjet usa HTTPS. `ENVIADO` indica aceptación del proveedor; entrega y lectura son estados distintos.
+- `POST /api/agente/ejecutar` permite seleccionar herramientas con Gemini dentro de la lista que Python valida, pero no despacha correo. El recorrido de envío verificado usa orden seguro. Las rutas históricas de perfiles y cola no están montadas, y `backend/main.py` no inicia el planificador, incluso si existe configuración del cron. Render Free no conserva datos locales tras reinicios.
+- El contenedor compila React y FastAPI sirve los archivos estáticos y la API desde un origen. Las claves de Gemini y Mailjet son variables de entorno del servidor; el middleware registra rutas sin identificadores personales. Los detalles de operación se encuentran en el [README](../README.md) y en [automatización](10-automatizacion.md).
 
 ---
 

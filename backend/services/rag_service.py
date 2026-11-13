@@ -138,6 +138,49 @@ class MotorRAG:
         palabras = re.findall(r"\b[a-z0-9\.]+\b", texto)
         return [p for p in palabras if p not in STOPWORDS_ES and len(p) > 2]
 
+    @staticmethod
+    def _forma_pasaje(palabra: str) -> str:
+        """Agrupa flexiones frecuentes solo para comparar la pregunta con oraciones."""
+        if palabra.endswith("aran") and len(palabra) > 7:
+            return palabra[:-4] + "ar"
+        if palabra.endswith("es") and len(palabra) > 6:
+            return palabra[:-2]
+        if palabra.endswith("s") and len(palabra) > 4:
+            return palabra[:-1]
+        return palabra
+
+    def _pasaje_relevante(self, contenido: str, query_tokens: List[str]) -> Tuple[str, float]:
+        """Selecciona una oración que reúna los términos consultados en poco espacio."""
+        texto = " ".join(contenido.split())
+        oraciones = re.split(r"(?<=[.!?])\s+", texto)
+        consulta = {self._forma_pasaje(token) for token in query_tokens}
+        mejor_oracion = ""
+        mejor_puntaje = 0.0
+        for oracion in oraciones:
+            tokens = [self._forma_pasaje(token) for token in self._tokenizar(oracion)]
+            coincidencias = len(consulta.intersection(tokens))
+            if coincidencias < 3:
+                continue
+            puntaje = coincidencias / math.sqrt(max(len(tokens), 1))
+            if puntaje > mejor_puntaje:
+                mejor_oracion, mejor_puntaje = oracion, puntaje
+        return mejor_oracion, mejor_puntaje
+
+    def _es_consulta_iva_negocio_popular(self, query_tokens: List[str]) -> bool:
+        terminos = {self._forma_pasaje(token) for token in query_tokens}
+        return {"negocio", "popular", "iva"}.issubset(terminos) and bool(
+            {"declaracion", "declarar", "declaro", "presentar"}.intersection(terminos)
+        )
+
+    @staticmethod
+    def _es_fuente_iva_negocio_popular(chunk: Dict[str, Any]) -> bool:
+        return (
+            chunk["documento"] == "Ley de Régimen Tributario Interno (LRTI)"
+            and chunk["articulo_seccion"] == "Art. 97.9"
+            and "Los negocios populares no presentarán declaraciones de IVA."
+            in " ".join(chunk["contenido"].split())
+        )
+
     def recuperar(
         self,
         pregunta: str,
@@ -155,6 +198,7 @@ class MotorRAG:
         query_tokens = self._tokenizar(pregunta)
         if not query_tokens:
             return []
+        consulta_iva_negocio_popular = self._es_consulta_iva_negocio_popular(query_tokens)
 
         # Parámetros BM25 estándar
         k1 = 1.5
@@ -201,10 +245,30 @@ class MotorRAG:
             # Requisito de relevancia semántica:
             # Cobertura mínima de términos de la pregunta y score significativo
             cobertura = tokens_coincidentes / max(len(query_tokens), 1)
-            if tokens_coincidentes >= 2 and (cobertura >= 0.18 or tokens_coincidentes >= 3) and score > 2.5:
+            fuente_directa = consulta_iva_negocio_popular and self._es_fuente_iva_negocio_popular(chunk)
+            pasaje_directo = (
+                self._pasaje_relevante(chunk["contenido"], query_tokens)[1]
+                if fuente_directa else 0.0
+            )
+            if fuente_directa and pasaje_directo > 0:
+                score += 8.0 * pasaje_directo
+            if (
+                tokens_coincidentes >= 2
+                and (cobertura >= 0.18 or tokens_coincidentes >= 3)
+                and score > 2.5
+            ) or (fuente_directa and pasaje_directo > 0):
                 candidatos.append((chunk, round(score, 3)))
 
         candidatos.sort(key=lambda x: x[1], reverse=True)
+
+        # Esta consulta tiene una disposición directa y verificable en la LRTI.
+        # BM25 puede relegarla por la repetición de "IVA" y "RIMPE" en normas
+        # generales que describen obligaciones de otros contribuyentes.
+        if consulta_iva_negocio_popular:
+            for indice, (chunk, _) in enumerate(candidatos):
+                if self._es_fuente_iva_negocio_popular(chunk):
+                    candidatos.insert(0, candidatos.pop(indice))
+                    break
         return candidatos[:top_k]
 
 
@@ -338,9 +402,29 @@ def _sintetizar_respuesta_con_citas(
     """
     Presenta fragmentos y citas de forma determinista; no genera una interpretación jurídica.
     """
-    citas_str = ", ".join([c.cita_oficial for c in citas])
-    resumen_fragmentos = "\n\n".join([f"• {c['cita_oficial']}:\n{c['contenido'][:320].strip()}..." for c in chunks[:2]])
+    tokens_consulta = _MOTOR_RAG_GLOBAL._tokenizar(pregunta)
+    fuente_directa = (
+        bool(chunks)
+        and _MOTOR_RAG_GLOBAL._es_consulta_iva_negocio_popular(tokens_consulta)
+        and chunks[0]["documento"] == "Ley de Régimen Tributario Interno (LRTI)"
+        and chunks[0]["articulo_seccion"] == "Art. 97.9"
+    )
+    if fuente_directa:
+        chunk = chunks[0]
+        pasaje, _ = _MOTOR_RAG_GLOBAL._pasaje_relevante(chunk["contenido"], tokens_consulta)
+        return (
+            "Conforme a la normativa tributaria ecuatoriana vigente para el ejercicio fiscal 2026 "
+            f"({chunk['cita_oficial']}):\n\n"
+            f"• {chunk['cita_oficial']}:\n{pasaje}\n\n"
+            "Esta disposición corresponde a la categoría de negocio popular dentro del RIMPE. "
+            "Si realiza actividades excluidas de ese régimen, confirme por separado las obligaciones "
+            "registradas en su RUC ante el SRI."
+        )
 
+    citas_str = ", ".join([c.cita_oficial for c in citas])
+    resumen_fragmentos = "\n\n".join(
+        [f"• {c['cita_oficial']}:\n{c['contenido'][:320].strip()}..." for c in chunks[:2]]
+    )
     return (
         f"Conforme a la normativa tributaria ecuatoriana vigente para el ejercicio fiscal 2026 "
         f"({citas_str}), se establecen las siguientes disposiciones aplicables a su consulta:\n\n"

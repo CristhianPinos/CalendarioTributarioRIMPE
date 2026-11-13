@@ -1,58 +1,69 @@
 # Bitácora Técnica de Trabajo - Semana 4 (Fase 4)
 
-**Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE
-
-**Fase:** Preparación, despliegue y validación del producto
-
-**Periodo:** Noviembre de 2026
-**Estado:** Demostración pública y CI de la versión candidata verificados.
-
----
-
-## 1. Trabajo principal de la fase
-
-### Contenedor y demostración pública
-
-- Se preparó una imagen Docker multietapa que compila React, instala el backend y ejecuta FastAPI sin privilegios. `render.yaml` configura el servicio Free y la comprobación `/health`.
-- Render Free se usa solo como **demostración**, debido a su almacenamiento efímero. La versión candidata pública corresponde al commit `414bc44`, informa `3.3.0` y mantiene desactivados el registro de perfiles y el escaneo periódico. No demuestra persistencia de recordatorios.
-- El [README](../../../README.md) incorpora la URL pública, instrucciones de ejecución, resultados y límites.
-
-### Pruebas, evaluación y protección de datos
-
-- La [primera batería funcional](../../08-pruebas.md) contra Render terminó con **18/18 casos aprobados**, incluida una inyección de prompt. La [evaluación histórica](../../07-evaluacion.md#8-comparación-de-la-semana-4) conservó 10/10 perfiles, 23/23 fechas, Hit@3 16/16, citas 16/16 y F1 de abstención del 100 % en el conjunto usado. Esas cifras corresponden al commit `84cc378`; la evaluación de la versión candidata figura más adelante.
-- Se comprobaron el build de Render, `/health`, la interfaz y una [corrida verde de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/42435193745). Las claves se configuran fuera de la imagen y del repositorio. Las decisiones sobre almacenamiento y minimización de datos constan en [ADR](../../09-decisiones.md) y [riesgos](../../riesgos.md).
-- Una llamada real de explicación en la demo terminó en el catálogo determinista tras errores del proveedor. La presencia de la clave no demuestra que Gemini genere explicaciones en vivo.
-
-### Mejoras posteriores a la primera demostración
-
-- Se sustituyó el registro de perfiles con operador por un flujo puntual: el contribuyente genera el calendario sin guardar el perfil y, si solicita un recordatorio, verifica el correo mediante un código y confirma el envío. El transporte usa Mailjet por HTTPS. El usuario confirmó la recepción local del código y del recordatorio. Las rutas administrativas de perfiles y cola y el planificador no se montan en la aplicación actual.
-- El formulario pide los datos manualmente y deja el correo para el modal. Hay [15 perfiles ficticios](../../datos-prueba-perfiles.md) para pruebas. El calendario aparece después del cálculo, con un resumen del perfil de la sesión. También se mejoraron la legibilidad de los eventos y la validación del simulador.
-- El modal muestra la explicación de Gemini cuando está disponible y etiqueta la contingencia cuando no lo está. Se añadieron los comprobantes pertinentes y se limitó la opción de declaración en cero al IVA semestral. El correo usa la obligación y fecha calculadas por Python, y escapa el texto variable antes de incorporarlo al HTML. La interfaz incluye un aviso sobre el apoyo de IA y enlaces normativos revisados.
-- Al cotejar la renta de Emprendedor persona natural con el art. 8 de la [resolución SRI NAC-DGERCGC24-00000027](https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar?id=7c3fb8dc-31a6-4fe3-a6c0-abe1def2c78a&nombre=NAC-DGERCGC24-00000027.pdf), se corrigió su mes a mayo en el cálculo y la configuración. La corrección quedó incorporada al despliegue posterior.
-- Se añadió una cuota en memoria a la ruta que llama a Gemini, con límites por IP e instancia y respuesta `429` con `Retry-After`. La entrada variable y los tokens de salida se acotaron. El calendario, el RAG local y el simulador no consumen esta cuota. La protección se incorporó al despliegue posterior.
-- El agente de demostración ahora admite selección de herramientas por Gemini entre acciones autorizadas por Python, con máximo de pasos, trazas de origen y retorno al flujo seguro ante fallos. El envío verificado conserva su secuencia determinista y su compuerta humana; la selección generativa no decide destinatarios, cálculos ni despachos.
-- Se auditó el índice RAG y se corrigió la atribución de considerandos y disposiciones en las resoluciones. La evaluación local distingue cita formal de fuente pertinente: 15/16 artículos y 4/5 pares documento–artículo en la muestra curada. Se documentó una consulta de IVA cuyo artículo directo no aparece en el top 3; las métricas históricas de la demo no describen este estado local.
-- Se incorporaron la [declaración de uso de IA](../../declaracion-uso-ia.md) y el [seguimiento de la revisión escrita](observaciones-revision.md). Las evidencias distinguen los fallos iniciales de Gemini y la respuesta real obtenida después con Flash Lite. Las observaciones orales quedan pendientes de las notas del equipo.
-- Se preparó la [presentación de sustentación](../../sustentacion-grupo11.pdf) con la plantilla de UNIANDES proporcionada por el equipo y un [guion de 12 minutos](../../guion-sustentacion.md). El PDF se revisó visualmente antes de incorporarlo; aún no se ha entregado.
-- Tras comprobar que el modelo anterior devolvía contingencia por 429/503, se probó y publicó `gemini-3.5-flash-lite`. Respondió en casos locales de IVA, declaración en cero y renta; en Render generó una explicación real y seleccionó tres herramientas permitidas sin autorizar el envío. Python fija la fecha textual. La batería HTTP pública aprobó 18/18 casos. El usuario completó el flujo del modal con un código nuevo y confirmó la recepción del recordatorio en Gmail.
-- Se añadió detección de secretos al flujo de CI. Una prueba antigua que esperaba otra referencia legal bloqueó la primera corrida y se corrigió sin alterar el catálogo tributario. La [corrida verde](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) aprobó 235 pruebas, evaluación, frontend e imagen Docker. `/health` identificó el mismo commit antes y después de las pruebas públicas: 18/18 casos HTTP, 10/10 perfiles, 23/23 fechas, Hit@3 de 15/16 y abstención TP/TN/FP/FN de 4/16/0/0.
+- **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE (Caso 11 - Grupo 11)
+- **Fase:** Despliegue, validación y cierre documental
+- **Integrantes:** Juan Lucumi (Desarrollador A) y Cristhian Pinos (Desarrollador B)
+- **Rama de trabajo:** `main`
+- **Periodo:** Noviembre de 2026 / Fase 4 – Semana 4
+- **Estado:** Demostración pública y CI verificados; entrega formal a cargo del equipo.
 
 ---
 
-## 2. Línea base para el cierre
+## 1. Registro de tareas ejecutadas
 
-| Ámbito | Evidencia comprobada | Límite |
+### Paso 1: Contenedor y demostración pública
+
+- Se preparó una imagen Docker multietapa que compila React y sirve frontend y API desde FastAPI con un usuario sin privilegios. `render.yaml` configura la comprobación `/health` y el despliegue automático después de aprobar CI.
+- Render Free se eligió para **demostración** por su almacenamiento efímero. El calendario funciona sin guardar perfiles; el registro administrativo y el escaneo periódico permanecen desactivados. Esta configuración no promete persistencia de recordatorios.
+- El [README](../../../README.md) reúne la URL, las instrucciones de ejecución, las pruebas y los límites de la demo. La justificación del alcance está en [decisiones-semana-4.md](decisiones-semana-4.md) y [ADR-007](../../09-decisiones.md).
+
+### Paso 2: Flujo del contribuyente y recordatorio puntual
+
+- Se retiraron los perfiles de carga rápida y la exigencia de operador. El usuario introduce manualmente los datos del contribuyente, genera el calendario y ve un resumen del perfil de la sesión. Los [15 perfiles ficticios](../../datos-prueba-perfiles.md) sirven para pruebas sin almacenar correos.
+- Se mejoraron la lectura de eventos del calendario y los mensajes del simulador de renta. El modal deja el correo para el momento del envío, muestra los comprobantes pertinentes y ofrece declaración en cero solo para IVA semestral.
+- El despacho puntual exige un código enviado al correo elegido y confirmación expresa. Mailjet usa HTTPS; Python determina la obligación y la fecha y escapa el texto variable del HTML. El usuario confirmó la recepción del código y del recordatorio desde el modal público. La aceptación de Mailjet y la recepción confirmada por el destinatario son evidencias distintas.
+
+### Paso 3: IA, agente y fuentes normativas
+
+- Se limitó el consumo de Gemini por cliente e instancia y se acotaron las entradas y los tokens de salida. El agente de demostración permite a Gemini elegir entre herramientas autorizadas por Python, con trazas y máximo de pasos; el envío verificado mantiene una secuencia segura y la compuerta humana.
+- Los errores 429/503 del modelo anterior activaron el catálogo de contingencia. Tras probar `gemini-3.5-flash-lite`, la demo produjo una explicación real y el agente seleccionó tres herramientas permitidas en una ejecución sintética sin autorización de envío. Python conserva el control de las fechas, incluso del texto de fecha que devuelve el modelo.
+- Se corrigió a mayo el vencimiento de renta para Emprendedor persona natural después de cotejar el art. 8 de la [resolución SRI NAC-DGERCGC24-00000027](https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar?id=7c3fb8dc-31a6-4fe3-a6c0-abe1def2c78a&nombre=NAC-DGERCGC24-00000027.pdf). La revisión del índice RAG mejoró la atribución de considerandos y disposiciones. Posteriormente se corrigió en local la recuperación de la fuente directa para la consulta sobre IVA de Negocio Popular, pendiente de verificar en Render.
+
+### Paso 4: Verificación y documentación de la entrega
+
+- CI incorpora detección de secretos, pruebas de backend, evaluación, compilación React y construcción Docker. Una prueba que esperaba una referencia legal antigua impidió la primera corrida verde; se actualizó la prueba sin cambiar el catálogo tributario.
+- El endpoint `/health` identifica el commit servido por Render. La [corrida aprobada](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) y las pruebas públicas corresponden al mismo commit `414bc44`. Los resultados detallados están en [pruebas](../../08-pruebas.md) y [evaluación](../../07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render).
+- Se revisó visualmente la versión local en móvil, tableta y escritorio con un perfil ficticio. Se ajustaron la cabecera y los pasos del formulario en pantallas estrechas, y se hizo desplazable el calendario para conservar la lectura del vencimiento completo.
+- Se incorporaron la [declaración de uso de IA](../../declaracion-uso-ia.md), la [matriz de riesgos](../../riesgos.md) y la [presentación PDF](../../sustentacion-grupo11.pdf). La entrega del archivo final sigue a cargo del equipo.
+
+---
+
+## 2. Observaciones de la revisión y respuesta del proyecto
+
+La fuente de esta sección es «Progreso del Proyecto Grupo 11.pdf», entregado por el equipo. El usuario confirmó que los comentarios recibidos en la revisión coinciden en lo esencial con ese informe; no hay una lista oral adicional que documentar. La revisión examinó el repositorio del 7 de noviembre y su diagnóstico corresponde a esa versión, no al código posterior. La tabla registra cada observación y la mejora aplicada, con su límite comprobable.
+
+| Observación escrita | Acción realizada y decisión relacionada | Evidencia y estado |
 | --- | --- | --- |
-| Demo Render | `/health` informó el commit `414bc44`; 18/18 casos HTTP y la evaluación actual aprobaron sobre ese despliegue | La evaluación comparada histórica corresponde al commit `84cc378`. La disponibilidad futura de Gemini no está garantizada. |
-| Backend y CI | Versión `3.3.0`; 235 pruebas de backend aprobaron en CI con Python 3.12 | La suite completa local se bloqueó con `TestClient` en Python 3.14; no se presenta como aprobada en ese entorno. |
-| Frontend local | `npm run build` aprobó; `npm run lint` terminó sin errores | El linter mantiene advertencias en calendario y modal. Falta una inspección visual de la versión final. |
-| Integración externa | Flash Lite respondió en Render; el usuario recibió en Gmail un código solicitado desde el modal y el recordatorio posterior | Mailjet confirmó aceptación; la entrega final se conoce por la confirmación del destinatario, no por un acuse técnico del proveedor. |
+| Faltaba URL pública, `/health` y una batería en Render. | Se publicó la demo Free y se delimitó su uso a consultas sin perfiles persistidos. Véanse [decisiones de despliegue](decisiones-semana-4.md#render-free-como-demostración) y [ADR-007](../../09-decisiones.md). | `/health` identificó `414bc44`; [18/18 casos HTTP](../../08-pruebas.md#verificación-de-la-versión-candidata-etapa-6) y [evaluación pública](../../07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render) sobre ese commit. |
+| Pipeline CI/CD, documentación de instalación y pruebas públicas estaban a medias. | Se configuró el despliegue tras CI aprobado, se añadió detección de secretos y se actualizó el README con ejecución local, Docker, Render y reproducción de pruebas. | [CI aprobado](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513); 18/18 casos HTTP en Render. La disponibilidad sostenida no se infiere de una corrida. |
+| El agente seguía un orden fijo; Gemini no elegía herramientas. | Se añadió una selección acotada a herramientas permitidas por Python, con retorno al flujo seguro. El envío con código conserva la selección determinista. Véanse [decisión de la semana](decisiones-semana-4.md#selección-acotada-de-herramientas) y [ADR-012](../../09-decisiones.md). | En Render, tres herramientas registraron origen `gemini` con datos sintéticos; el envío quedó pendiente de confirmación. |
+| No había límite de tasa real en las rutas de IA. | Se implantaron límites por cliente e instancia, respuesta `429` con `Retry-After` y límites de entrada y salida. | Las [pruebas de cuota](../../../backend/tests/test_explanation_rate_limit.py) aprobaron en CI; los contadores siguen siendo locales al proceso. |
+| El texto variable del correo no se escapaba al generar HTML. | Se aplicó escape de HTML y se mantuvo la verificación del destinatario y la confirmación humana. Véase [decisión de minimización](decisiones-semana-4.md#minimización-de-datos-y-rechazo-de-consultas-de-evasión). | Las [pruebas de correo](../../../backend/tests/test_correo_verificado.py) aprobaron en CI; el usuario confirmó la recepción pública del recordatorio. |
+| El envío se había protegido con operador y estados SMTP, pero ese flujo dificultaba el uso público y SMTP no funcionó desde Render Free. | Se retiraron las credenciales de operador del flujo activo y el registro de perfiles; se sustituyó SMTP **solo en el envío puntual** por Mailjet HTTPS. El código al destinatario y la confirmación expresa conservan la compuerta humana. El transporte SMTP y SQLite permanecen como implementación histórica sin rutas públicas. Véanse [ADR-010 y ADR-011](../../09-decisiones.md). | El usuario recibió el código y el recordatorio desde Render; la respuesta `ENVIADO` por sí sola acredita aceptación del proveedor, no entrega. No se comprobó persistencia tras reinicio. |
+| El índice RAG, las citas y el conjunto de evaluación requerían mayor precisión. | Se documentó la recuperación por artículo, se separó presencia de cita de pertinencia jurídica y se añadieron controles de abstención y de fuente y artículo. La consulta PREG-02 se corrigió después de la evaluación pública. | [Evaluación pública](../../07-evaluacion.md#10-evaluación-de-la-versión-candidata-en-render): 15/16 Hit@3 y 4/5 fuente y artículo; [evaluación local posterior](../../07-evaluacion.md#11-corrección-local-de-la-consulta-preg-02): 16/16 y 5/5. Esta última aún no representa Render. |
+| Faltaban declaración de IA, respuesta a observaciones y presentación. | Se incorporaron la declaración, esta respuesta a la revisión y el PDF de sustentación. | Material preparado en `docs/`; la entrega formal del paquete corresponde al equipo. |
 
-Los resultados detallados permanecen en [pruebas](../../08-pruebas.md) y [evaluación](../../07-evaluacion.md). Esta bitácora recoge las conclusiones principales de la fase.
+---
 
-## 3. Pendientes para completar la entrega
+## 3. Resumen de validaciones de la semana
 
-- Si el servicio pasa a varias instancias, mover los contadores de cuota a un almacén compartido. La implementación actual es deliberadamente local al proceso único y se reinicia al arrancar.
-- Revisar periódicamente la cuota y disponibilidad de Gemini; la contingencia determinista sigue siendo necesaria ante fallos del proveedor.
-- Revisar visualmente la versión candidata antes de la entrega; la batería HTTP y la evaluación ya se repitieron contra el commit identificado en Render.
-- Incorporar las observaciones orales de la sustentación cuando el equipo aporte sus notas. El usuario preparará el paquete final sin secretos ni datos personales y realizará la entrega.
+| Ámbito | Resultado verificado | Límite de la evidencia |
+| --- | --- | --- |
+| Primera demostración (`84cc378`) | 18/18 casos HTTP; evaluación histórica de 10/10 perfiles, 23/23 fechas y Hit@3 de 16/16 | Usa el evaluador y el corpus de aquel commit; no describe el estado actual del RAG. |
+| Versión candidata (`414bc44`) | CI verde: 235 pruebas de backend, evaluación local, escaneo de secretos, compilación React e imagen Docker. Render: 18/18 casos HTTP y `/health` con el mismo SHA. | La suite completa local con Python 3.14 se bloqueó en `TestClient`; el resultado completo corresponde a CI con Python 3.12. |
+| Evaluación actual en Render | 10/10 perfiles, 23/23 fechas, Hit@3 de 15/16, citas coherentes 16/16, fuente y artículo 4/5; abstención TP/TN/FP/FN de 4/16/0/0 | Una cita formal no garantiza pertinencia jurídica. PREG-02 aún no recupera la fuente directa entre las tres primeras. |
+| Corrección posterior en local | Hit@3 de 16/16 y fuente y artículo 5/5; PREG-02 muestra la frase directa de la LRTI. | La [medición local](../../../eval/resultados_preg02_local.json) todavía no describe el servicio público. |
+| Revisión visual local | Se comprobó el perfil, el calendario, el vencimiento y su modal en móvil; la distribución del calendario también se revisó en tableta y escritorio. | Los ajustes de presentación siguen en local y necesitan comprobarse en Render cuando se publiquen. |
+| Integraciones externas | Flash Lite produjo una explicación real en Render; el usuario recibió el código y el recordatorio en Gmail. | La disponibilidad futura de Gemini y la entrega futura de Mailjet no quedan garantizadas por una prueba puntual. |
+
+La [evaluación detallada](../../07-evaluacion.md) conserva por separado las mediciones históricas y el [resultado JSON actual](../../../eval/resultados_etapa6_render.json). El commit documental posterior usó `[skip render]`; la demo continuó sirviendo el SHA evaluado `414bc44`.

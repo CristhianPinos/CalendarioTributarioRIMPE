@@ -7,7 +7,7 @@
 **Versión de Evaluación:** `3.0.0`  
 **Entorno de Ejecución:** Python 3.14, FastAPI 0.110.0, Pytest 9.1.1, PyYAML, Pydantic v2  
 
-**Alcance histórico:** las secciones 1 a 8 conservan la evaluación de semanas 3 y 4 sobre el código y el dataset de entonces. Incluyen fechas de renta de Emprendedor persona natural en marzo que se corrigieron posteriormente a mayo. Sus métricas de citas indican coincidencia y formato según el evaluador anterior; no certifican pertinencia jurídica. La auditoría del estado local actual está en la sección 9.
+**Alcance histórico:** las secciones 1 a 8 conservan la evaluación de semanas 3 y 4 sobre el código y el dataset de entonces. Incluyen fechas de renta de Emprendedor persona natural en marzo que se corrigieron posteriormente a mayo. Sus métricas de citas indican coincidencia y formato según el evaluador anterior; no certifican pertinencia jurídica. La sección 9 documenta la auditoría RAG anterior; la sección 10 mide el commit público `414bc44` y la sección 11 recoge la corrección local posterior de PREG-02, aún sin verificar en Render.
 
 ---
 
@@ -284,3 +284,11 @@ Para reproducir sin sobrescribir archivos históricos:
 ```powershell
 python eval/run_eval.py --base-url https://calendario-rimpe-g11-demo.onrender.com --output eval/resultados_reproduccion_render.json
 ```
+
+---
+
+## 11. Corrección local de la consulta PREG-02
+
+La [LRTI, art. 97.9](https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/12c884d5-c8d9-4171-becc-1513b990b87a/LEY_DE_REGIMEN_TRIBUTARIO_INTERNO_LRTI.pdf) contiene la frase directa «Los negocios populares no presentarán declaraciones de IVA». El artículo ya estaba en el índice, pero BM25 lo relegaba frente a disposiciones generales donde se repiten «IVA» y «RIMPE». Para preguntas sobre declaraciones de IVA de Negocio Popular se prioriza ese fragmento solo si pasó los filtros de vigencia y régimen, conserva la frase verificada y su pasaje coincide con la consulta; así se cubren también variantes como «declarar IVA» sin cambiar el ranking general. La respuesta muestra la oración pertinente y advierte que las actividades excluidas deben revisarse por separado. Esta mejora no altera el cálculo tributario ni interpreta otras obligaciones.
+
+Se corrigió además la frase de referencia de PREG-02 en el dataset para que coincida con el texto de la ley. La [evaluación local posterior](../eval/resultados_preg02_local.json) obtuvo 10/10 perfiles, 23/23 fechas, Hit@3 de 16/16, citas coherentes 16/16, fuente y artículo 5/5, frase clave 4/16 y abstención TP/TN/FP/FN de 4/16/0/0. Los 14 controles específicos del RAG aprobaron. Las cifras de las secciones anteriores corresponden a versiones históricas y no se reescriben. Esta medición local no verifica aún el cambio en Render ni constituye una auditoría jurídica completa de todas las respuestas.

@@ -1,5 +1,7 @@
 # Propuesta de Proyecto: Calendario Tributario Inteligente para Emprendedores RIMPE
 
+> **Documento histórico de fase 1.** Las menciones a SMTP, perfiles guardados y notificaciones programadas describen la propuesta inicial. El flujo vigente calcula el calendario sin persistir perfiles, exige código y confirmación para el correo puntual y usa Mailjet por HTTPS. El escaneo periódico permanece inactivo. Véanse [arquitectura vigente](03-arquitectura.md#arquitectura-vigente) y [decisiones de fase 4](09-decisiones.md).
+
 | Metadato | Detalle |
 | :--- | :--- |
 | **Carrera** | Software |

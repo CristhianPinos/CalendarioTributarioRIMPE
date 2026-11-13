@@ -1,6 +1,6 @@
 # Documento de Diseño: Flujo Automatizado y Programado (Semana 3)
 
-> **Estado al 11 de noviembre de 2026:** este documento describe el diseño histórico de la semana 3. Las rutas `/api/perfiles` y `/api/flujo` y el planificador no se montan en la aplicación pública actual. El flujo activo es el envío puntual con código temporal de correo y confirmación; no requiere operador ni guarda perfiles tributarios. Véase ADR-010 en `docs/09-decisiones.md`.
+> **Estado al cierre de fase 4:** este documento conserva el diseño histórico de la semana 3. Las rutas `/api/perfiles` y `/api/flujo` y el planificador no se montan en la aplicación actual, local ni pública. El flujo activo es el envío puntual con código temporal y confirmación; no requiere operador, no guarda perfiles tributarios y usa Mailjet HTTPS en lugar de SMTP. Los diagramas y estados SMTP de abajo corresponden solo al código histórico. Véanse [ADR-010 y ADR-011](09-decisiones.md).
 
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE  
 **Módulo:** Automatización de Tareas Diarias y Notificaciones Programadas (`backend/services/scheduler.py`)  
