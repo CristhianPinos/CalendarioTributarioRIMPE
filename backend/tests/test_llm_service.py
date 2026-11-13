@@ -170,7 +170,7 @@ class TestInvocacionExitosa:
                         "text": (
                             '{"codigo_obligacion": "RENTA_ANUAL_EMPRENDEDOR", '
                             '"titulo_pedagogico": "Impuesto a la Renta Ejercicio Fiscal", '
-                            '"fecha_limite_formateada": "24 de Marzo 2027", '
+                            '"fecha_limite_formateada": "1 de enero de 2020", '
                             '"base_legal_oficial": "Ley de Eficiencia Económica y LRTI", '
                             '"explicacion_sencilla": "Liquidación anual obligatoria con tabla progresiva.", '
                             '"consecuencia_incumplimiento": "Recargo del 20% más intereses de mora.", '
@@ -194,6 +194,7 @@ class TestInvocacionExitosa:
         resp = generar_explicacion_obligacion(request=req, api_key="test-key")
 
         assert resp.obligacion.codigo_obligacion == "RENTA_ANUAL_EMPRENDEDOR"
+        assert "24 de marzo de 2027" in resp.obligacion.fecha_limite_formateada
         assert resp.tokens_utilizados == 512
         assert resp.tiempo_generacion_ms > 0
         assert isinstance(resp.obligacion, RecordatorioEstructurado)

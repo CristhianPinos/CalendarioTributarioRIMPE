@@ -18,4 +18,4 @@
 | 10. Equipo | 0:45 | Describir los aportes verificables de cada integrante. |
 | 11. Cierre | 0:10 | Concluir y abrir preguntas. |
 
-La demostración pública usa un commit anterior al flujo local de Mailjet. Si se presenta la URL de Render, no atribuirle el envío verificado ni las mejoras locales. La última prueba manual de explicación mostró `fallback-determinista-sri`; no describirla como una respuesta de Gemini.
+La demostración pública consultada usa el commit `2444cb3` y la versión `3.3.0`. Mailjet aceptó una solicitud de código de prueba en ese despliegue, pero aún no hay confirmación de recepción ni del envío posterior para esa sesión. Las explicaciones públicas comprobadas mostraron `fallback-determinista-sri` por respuestas 429/503 de Gemini. La mejora a Flash Lite generó explicaciones y una selección de herramienta solo en pruebas locales; no atribuir esos resultados a Render hasta verificar un nuevo despliegue.

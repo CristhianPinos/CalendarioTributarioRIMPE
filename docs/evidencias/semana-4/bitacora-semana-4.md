@@ -34,6 +34,7 @@
 - Se auditó el índice RAG y se corrigió la atribución de considerandos y disposiciones en las resoluciones. La evaluación local distingue cita formal de fuente pertinente: 15/16 artículos y 4/5 pares documento–artículo en la muestra curada. Se documentó una consulta de IVA cuyo artículo directo no aparece en el top 3; las métricas históricas de la demo no describen este estado local.
 - Se incorporaron la [declaración de uso de IA](../../declaracion-uso-ia.md) y el [seguimiento de la revisión escrita](observaciones-revision.md). Las evidencias diferencian el despliegue anterior de los cambios locales y registran que Gemini sigue mostrando contingencia en la prueba manual. Las observaciones orales quedan pendientes de las notas del equipo.
 - Se preparó la [presentación de sustentación](../../sustentacion-grupo11.pdf) con la plantilla de UNIANDES proporcionada por el equipo y un [guion de 12 minutos](../../guion-sustentacion.md). El PDF se revisó visualmente antes de incorporarlo; aún no se ha entregado.
+- Tras publicar `2444cb3`, se comprobó `/health` con versión `3.3.0` y la aceptación de un código de prueba por Mailjet en Render. Las explicaciones públicas seguían en contingencia: los logs mostraron 429/503 de Gemini. Se probó localmente `gemini-3.5-flash-lite` con explicaciones de IVA, declaración en cero y renta, además de una selección de herramienta; respondió en los casos ensayados. El modelo predeterminado se cambió localmente y la fecha textual quedó fijada por Python.
 
 ---
 
@@ -41,16 +42,16 @@
 
 | Ámbito | Evidencia comprobada | Límite |
 | --- | --- | --- |
-| Demo Render | `/health` HTTP 200, versión `3.2.0`, modo demostración; 18/18 pruebas HTTP y evaluación comparada del 9 de noviembre | No contiene Mailjet ni las mejoras locales posteriores. |
+| Demo Render | El commit `2444cb3` informó `/health` HTTP 200, versión `3.3.0`; Mailjet aceptó la solicitud de un código de prueba | El resultado de 18/18 pruebas HTTP y la evaluación comparada corresponden al commit anterior `84cc378`. La aceptación del código no prueba recepción ni el envío completo en esta versión. |
 | Backend local | Versión `3.3.0`; 212 pruebas recolectadas y 116 pruebas unitarias y directas aprobadas en esta comprobación | La suite completa se detuvo al comenzar una prueba HTTP con `TestClient` en Python 3.14; no se considera aprobada. |
 | Frontend local | `npm run build` aprobó; `npm run lint` terminó sin errores | El linter mantiene advertencias en calendario y modal. Falta una inspección visual de la versión final. |
-| Integración externa | Recepción local del código y recordatorio confirmada por el usuario; contingencia ante fallo de Gemini observada | Mailjet y Gemini en vivo no se han validado en la versión pública actual. |
+| Integración externa | Recepción local del código y recordatorio confirmada por el usuario; Flash Lite generó explicaciones y selección en pruebas locales; Render aceptó una solicitud de código | Falta confirmar recepción del código público y verificar Flash Lite después de publicar el cambio de modelo. |
 
 Los resultados detallados permanecen en [pruebas](../../08-pruebas.md) y [evaluación](../../07-evaluacion.md). Esta bitácora recoge las conclusiones principales de la fase.
 
 ## 3. Pendientes para completar la entrega
 
 - Si el servicio pasa a varias instancias, mover los contadores de cuota a un almacén compartido. La implementación actual es deliberadamente local al proceso único y se reinicia al arrancar.
-- Verificar la selección de herramientas con Gemini en vivo cuando la cuota esté disponible; las pruebas actuales cubren respuestas simuladas y el recorrido seguro.
+- Verificar en Render la selección y la explicación con Flash Lite después de publicar el cambio local. Las pruebas reales locales usaron datos ficticios y no autorizaron correos.
 - Repetir pruebas, evaluación y revisión visual sobre la versión candidata y, tras una publicación autorizada, contra esa misma versión en Render. Actualizar README y evidencias con el commit verificado.
 - Incorporar las observaciones orales de la sustentación cuando el equipo aporte sus notas. El usuario preparará el paquete final sin secretos ni datos personales y realizará la entrega.

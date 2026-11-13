@@ -37,7 +37,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
 ```
 
-Antes de iniciar, abra `.env`: `GEMINI_API_KEY` viene vacía para usar el catálogo de contingencia; añada una clave válida si necesita explicaciones generativas. El ejemplo usa `gemini-3.8-flash`, [modelo incluido en la lista oficial de Google](https://ai.google.dev/gemini-api/docs/models). Para enviar correos, configure `MAILJET_API_KEY`, `MAILJET_SECRET_KEY` y `MAILJET_FROM_EMAIL` con un remitente validado en Mailjet. El usuario solicita un código al correo elegido, lo introduce en el modal y confirma el envío; no necesita cuenta de operador ni registrar un perfil. [`.env.example`](.env.example) describe las variables; `.env` está excluido de Git. No use datos personales reales en la demostración Free actual.
+Antes de iniciar, abra `.env`: `GEMINI_API_KEY` viene vacía para usar el catálogo de contingencia; añada una clave válida si necesita explicaciones generativas. El modelo predeterminado es [`gemini-3.5-flash-lite`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite), validado localmente con explicaciones estructuradas; puede cambiarlo con `GEMINI_MODEL`. Para enviar correos, configure `MAILJET_API_KEY`, `MAILJET_SECRET_KEY` y `MAILJET_FROM_EMAIL` con un remitente validado en Mailjet. El usuario solicita un código al correo elegido, lo introduce en el modal y confirma el envío; no necesita cuenta de operador ni registrar un perfil. [`.env.example`](.env.example) describe las variables; `.env` está excluido de Git. No use datos personales reales en la demostración Free actual.
 
 Abra dos terminales desde la raíz:
 
@@ -67,7 +67,7 @@ Visite [http://localhost:8000](http://localhost:8000). `compose.yaml` conserva S
 
 ## Despliegue de demostración en Render Free
 
-[`render.yaml`](render.yaml) declara un único Web Service Docker con `/health`. Configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`; no incluye credenciales de Mailjet. La versión actualmente publicada aún es la anterior y se verificaron en ella el calendario, el RAG y la interfaz. El nuevo flujo puntual necesita claves de Mailjet configuradas en el servidor y una prueba adicional tras un despliegue autorizado.
+[`render.yaml`](render.yaml) declara un único Web Service Docker con `/health`. Configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`; las credenciales de Mailjet se configuran únicamente en el panel. El commit publicado `2444cb3` informó versión `3.3.0`: una solicitud de código fue aceptada por Mailjet, pero la explicación probada siguió en contingencia por respuestas 429/503 de Gemini. La elección de Flash Lite y la validación de fecha son mejoras locales pendientes de publicación.
 
 La instancia actual se creó mediante Blueprint y está disponible en la [URL verificada](https://calendario-rimpe-g11-demo.onrender.com/). Para reproducir el despliegue, conecte este repositorio en Render, seleccione Blueprint, revise las variables del servicio y guarde `GEMINI_API_KEY` como secreto si necesita Gemini en vivo. Publique una rama verificada, espere el build y compruebe `/health` y los [casos HTTP](docs/08-pruebas.md). La clave nunca debe entrar en Git.
 
@@ -94,11 +94,10 @@ La evaluación usa diez perfiles sintéticos y veinte preguntas normativas. Para
 
 - Las rutas `/api/perfiles` y `/api/flujo` no están expuestas. El envío puntual requiere código temporal enviado al destinatario, confirmación explícita y un intervalo mínimo entre envíos al mismo correo. No se guarda el perfil tributario; los códigos y contadores de tasa viven solo en memoria del proceso.
 - `POST /api/obligaciones/explicar` limita las consultas por IP (12 por 60 segundos) y por instancia (30 por 60 segundos); al agotar la ventana responde `429` con `Retry-After`. Los valores se pueden ajustar con `GEMINI_RATE_LIMIT_PER_CLIENT`, `GEMINI_RATE_LIMIT_GLOBAL` y `GEMINI_RATE_LIMIT_WINDOW_SECONDS`. La entrada variable y la salida de Gemini están acotadas. Los contadores se reinician con el proceso y no se comparten entre instancias; para varias réplicas se requeriría un almacén compartido.
-- `/api/agente/ejecutar` comparte esa cuota y reserva cuatro llamadas por ejecución, máximo de una selección por herramienta. El selector no transmite RUC, correo, nombre, importe ni la instrucción libre a Gemini. La versión publicada aún no incluye esta selección.
+- `/api/agente/ejecutar` comparte esa cuota y reserva cuatro llamadas por ejecución, máximo de una selección por herramienta. El selector no transmite RUC, correo, nombre, importe ni la instrucción libre a Gemini. La selección real se comprobó en local con Flash Lite; falta verificarla en Render con ese modelo.
 - Los logs no incluyen RUC ni correo completos. `ENVIADO` significa aceptación por Mailjet, no entrega o lectura. `ESTADO_INCIERTO` bloquea el reintento automático en la cola histórica.
 - El índice RAG y las reglas fiscales reflejan los documentos y la configuración versionados. Deben verificarse contra nuevas publicaciones del SRI antes de usarse para otro ejercicio. No se cambian reglas tributarias por una respuesta del LLM.
-- La versión desplegada en Render todavía usa el commit `84cc378`; el flujo de correo verificado y la integración con Mailjet están solo en el espacio local y no se han probado allí. Una consulta sintética al endpoint de explicaciones devolvió el catálogo de contingencia tras 54,3 s y 0 tokens; los logs registraron dos timeouts y un HTTP 503 del proveedor. Gemini en vivo requiere una nueva verificación satisfactoria. La aplicación tampoco sustituye la revisión de un profesional contable.
-- El servicio público del commit `84cc378` aún no aplica esta cuota de Gemini por cliente. Véase la [matriz de riesgos](docs/riesgos.md).
+- El commit público `2444cb3` aún usa `gemini-3.8-flash` y devolvió contingencia ante 429 y 503 del proveedor. La variante Flash Lite respondió en tres casos ficticios locales y el selector eligió una herramienta permitida; aún falta comprobarla tras publicar el nuevo commit. La aplicación no sustituye la revisión de un profesional contable. Véase la [matriz de riesgos](docs/riesgos.md).
 
 ## Uso ético de IA generativa
 

@@ -12,6 +12,7 @@ import os
 import json
 import time
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
@@ -39,13 +40,25 @@ load_dotenv(dotenv_path=ENV_PATH)
 logger = logging.getLogger("rimpe.llm_service")
 
 # Modelos recomendados ordenados por prioridad de disponibilidad
-PRIMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+PRIMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 try:
     MAX_OUTPUT_TOKENS = max(256, min(8192, int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "4096"))))
 except ValueError:
     MAX_OUTPUT_TOKENS = 4096
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 PROMPTS_DIR = BASE_DIR / "backend" / "prompts"
+
+
+def formatear_fecha_python(fecha_iso: str) -> str:
+    """Presenta la fecha recibida del cálculo sin aceptar una fecha reescrita por el LLM."""
+    try:
+        valor = date.fromisoformat(fecha_iso)
+    except ValueError:
+        return fecha_iso
+    dias = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+    meses = ("", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+             "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+    return f"{dias[valor.weekday()]} {valor.day} de {meses[valor.month]} de {valor.year}"
 
 
 def cargar_prompt_template(version: str = "v3") -> str:
@@ -436,6 +449,7 @@ def generar_explicacion_obligacion(
         recordatorio = RecordatorioEstructurado(**parsed_json)
         if recordatorio.codigo_obligacion != request.codigo_obligacion:
             raise ValueError("Gemini devolvió una obligación distinta a la solicitada")
+        recordatorio.fecha_limite_formateada = formatear_fecha_python(request.fecha_vencimiento)
         if not recordatorio.explicacion_sencilla.strip() or not recordatorio.sugerencia_accion.strip():
             raise ValueError("Gemini devolvió una explicación o acción vacía")
         if request.codigo_obligacion in BASE_LEGAL_POR_OBLIGACION:

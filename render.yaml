@@ -21,6 +21,6 @@ services:
       - key: RIMPE_DB_PATH
         value: /tmp/rimpe-demo/rimpe.sqlite3
       - key: GEMINI_MODEL
-        value: gemini-3.8-flash
+        value: gemini-3.5-flash-lite
       - key: LOG_LEVEL
         value: INFO
