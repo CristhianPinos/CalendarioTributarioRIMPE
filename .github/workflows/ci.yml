@@ -62,3 +62,32 @@ jobs:
 
     - name: Construir imagen Docker de producción
       run: docker build -t calendario-rimpe:ci .
+
+    - name: Comprobar índice RAG antes y después del reinicio Docker
+      run: |
+        set -euo pipefail
+        docker run --rm -d --name calendario-rimpe-rag-ci -p 127.0.0.1:18080:8000 calendario-rimpe:ci
+        trap 'docker rm -f calendario-rimpe-rag-ci >/dev/null 2>&1 || true' EXIT
+        pid_antes=$(docker inspect -f '{{.State.Pid}}' calendario-rimpe-rag-ci)
+        imagen_antes=$(docker inspect -f '{{.Image}}' calendario-rimpe-rag-ci)
+        fecha_antes=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        python scripts/check_rag_restart.py --output rag-antes.json
+        docker restart calendario-rimpe-rag-ci
+        pid_despues=$(docker inspect -f '{{.State.Pid}}' calendario-rimpe-rag-ci)
+        imagen_despues=$(docker inspect -f '{{.Image}}' calendario-rimpe-rag-ci)
+        fecha_despues=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        test "$pid_antes" != "$pid_despues"
+        test "$imagen_antes" = "$imagen_despues"
+        python scripts/check_rag_restart.py --output rag-despues.json --compare rag-antes.json
+        echo "Proceso anterior: $pid_antes; proceso nuevo: $pid_despues"
+        printf 'commit=%s\nimagen=%s\npid_antes=%s\npid_despues=%s\nfecha_antes_utc=%s\nfecha_despues_utc=%s\n' \
+          "$GITHUB_SHA" "$imagen_antes" "$pid_antes" "$pid_despues" "$fecha_antes" "$fecha_despues" > rag-reinicio-meta.txt
+
+    - name: Guardar evidencia del reinicio RAG
+      uses: actions/upload-artifact@v4
+      with:
+        name: rag-reinicio-docker
+        path: |
+          rag-antes.json
+          rag-despues.json
+          rag-reinicio-meta.txt
