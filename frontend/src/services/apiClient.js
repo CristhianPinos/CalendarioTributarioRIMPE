@@ -303,9 +303,16 @@ export async function solicitarCodigoCorreo(email) {
   });
 }
 
-export async function enviarRecordatorioVerificado({ email, codigo, perfil, anio, codigo_obligacion }) {
+export async function prepararRecordatorio({ email, perfil, anio, codigo_obligacion, explicacion_id }) {
+  return apiRequest("/api/correo/preparar-recordatorio", {
+    method: "POST",
+    body: JSON.stringify({ email, perfil, anio, codigo_obligacion, explicacion_id }),
+  });
+}
+
+export async function enviarRecordatorioVerificado({ email, codigo, perfil, anio, codigo_obligacion, borrador_id }) {
   return await apiRequest("/api/correo/enviar-recordatorio", {
     method: "POST",
-    body: JSON.stringify({ email, codigo, perfil, anio, codigo_obligacion, confirmacion_envio: true }),
+    body: JSON.stringify({ email, codigo, perfil, anio, codigo_obligacion, borrador_id, confirmacion_envio: true }),
   });
 }

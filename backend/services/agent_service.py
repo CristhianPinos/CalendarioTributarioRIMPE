@@ -254,7 +254,8 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
 
     if mailjet_service.configurado():
         try:
-            cuerpo_texto = f"{params.texto}\n\nID Auditoría: {id_auditoria}"
+            # El texto despachado debe coincidir con la vista previa aprobada.
+            cuerpo_texto = params.texto
             cuerpo_html = f"""
             <!DOCTYPE html>
             <html lang="es">
@@ -269,12 +270,9 @@ def tool_enviar_recordatorio(params: EnviarRecordatorioInput) -> EnviarRecordato
                 </div>
                 <div style="padding: 28px; color: #1e293b; font-size: 14px; line-height: 1.6;">
                   <div style="white-space: pre-wrap; margin-bottom: 24px;">{escape(params.texto)}</div>
-                  <div style="padding: 14px 18px; background-color: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 6px; font-size: 12px; color: #475569;">
-                    <strong>Confirmación HITL Registrada:</strong> Este recordatorio fue autorizado formalmente por el usuario en el asistente tributario interactivo.
-                  </div>
                 </div>
                 <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 28px; font-size: 11px; color: #64748b; font-family: monospace;">
-                  Audit ID: <strong>{id_auditoria}</strong> | Timestamp: {ts}
+                  Calendario RIMPE · Recordatorio informativo autorizado por el usuario
                 </div>
               </div>
             </body>
@@ -359,6 +357,7 @@ class AgenteTributarioRIMPE:
         base_imponible_iva: Optional[float] = None,
         confirmacion_envio: bool = False,
         codigo_obligacion: Optional[str] = None,
+        recordatorio_preparado: Optional[RedactarRecordatorioOutput] = None,
     ) -> ResultadoAgente:
         """
         Bucle ReAct principal:
@@ -478,7 +477,13 @@ class AgenteTributarioRIMPE:
                         titulo_obligacion=proxima["titulo"],
                         anio_fiscal=venc.anio_fiscal,
                     )
-                    out_redactar = tool_redactar_recordatorio(inp_redactar)
+                    if recordatorio_preparado is not None:
+                        if (recordatorio_preparado.codigo_obligacion != proxima["codigo_obligacion"]
+                                or recordatorio_preparado.fecha_vencimiento != proxima["fecha_vencimiento"]):
+                            raise ValueError("El borrador no coincide con el calendario calculado.")
+                        out_redactar = recordatorio_preparado
+                    else:
+                        out_redactar = tool_redactar_recordatorio(inp_redactar)
                     estado_contexto["recordatorio"] = out_redactar
                     trazas.append(TrazaEjecucionHerramienta(
                         herramienta="redactar_recordatorio",

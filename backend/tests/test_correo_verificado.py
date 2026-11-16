@@ -7,6 +7,10 @@ import httpx
 from backend.main import app
 from backend.routers import correo_router
 from backend.services.agent_service import ResultadoAgente
+from backend.schemas import ExplicacionObligacionRequest, ExplicacionObligacionResponse, PerfilTributarioCreate
+from backend.services.calculator import calcular_vencimientos
+from backend.services.llm import obtener_fallback_determinista
+from backend.services.reminder_drafts import remember_explanation, prepare_draft
 
 
 def request(method, path, **kwargs):
@@ -25,6 +29,25 @@ def payload(code="123456", confirm=True, email="destino@example.com"):
             "tipo_regimen": "RIMPE_EMPRENDEDOR", "email": email,
         },
     }
+
+
+def preparar_borrador(data):
+    profile = PerfilTributarioCreate(**data["perfil"])
+    year = data.get("anio", 2026)
+    obligation = data["codigo_obligacion"]
+    calendar = calcular_vencimientos(profile.ruc, profile.tipo_regimen.value, year, profile.tiene_actividades_excluidas)
+    event = next(item for item in calendar["eventos"] if item["codigo_obligacion"] == obligation)
+    request_data = ExplicacionObligacionRequest(
+        codigo_obligacion=obligation, tipo_regimen=profile.tipo_regimen,
+        fecha_vencimiento=event["fecha_vencimiento"],
+    )
+    response = ExplicacionObligacionResponse(
+        obligacion=obtener_fallback_determinista(obligation, event["fecha_vencimiento"], profile.tipo_regimen, False),
+        modelo_utilizado="fallback-determinista-sri",
+    )
+    explanation_id = remember_explanation(request_data, response)
+    data["borrador_id"] = prepare_draft(explanation_id, profile, data["email"], year, obligation)["borrador_id"]
+    return data
 
 
 def test_rutas_anteriores_cerradas_y_despacho_directo_bloqueado():
@@ -58,23 +81,24 @@ def test_codigo_obligatorio_unico_y_sin_perfil_persistido(monkeypatch):
         )
 
     monkeypatch.setattr(correo_router.AgenteTributarioRIMPE, "ejecutar", fake_agent)
-    assert request("POST", "/api/correo/enviar-recordatorio", json=payload()).status_code == 403
+    data = preparar_borrador(payload())
+    assert request("POST", "/api/correo/enviar-recordatorio", json=data).status_code == 403
     assert request("POST", "/api/correo/solicitar-codigo", json={"email": "destino@example.com"}).status_code == 200
     assert delivered["email"] == "destino@example.com"
-    assert request("POST", "/api/correo/enviar-recordatorio", json=payload(code="000000", confirm=False)).status_code == 403
-    assert request("POST", "/api/correo/enviar-recordatorio", json=payload(code="000000")).status_code == 403
-    success = request("POST", "/api/correo/enviar-recordatorio", json=payload(code=delivered["code"]))
+    assert request("POST", "/api/correo/enviar-recordatorio", json={**data, "codigo": "000000", "confirmacion_envio": False}).status_code == 403
+    assert request("POST", "/api/correo/enviar-recordatorio", json={**data, "codigo": "000000"}).status_code == 403
+    success = request("POST", "/api/correo/enviar-recordatorio", json={**data, "codigo": delivered["code"]})
     assert success.status_code == 200
     assert success.json()["estado_envio"] == "ENVIADO"
     assert called[0]["perfil"]["email"] == "destino@example.com"
     assert called[0]["confirmacion_envio"] is True
-    assert request("POST", "/api/correo/enviar-recordatorio", json=payload(code=delivered["code"])).status_code == 403
+    assert request("POST", "/api/correo/enviar-recordatorio", json={**data, "codigo": delivered["code"]}).status_code == 422
     assert request("POST", "/api/correo/solicitar-codigo", json={"email": "destino@example.com"}).status_code == 429
 
 
 def test_correo_de_perfil_debe_coincidir(monkeypatch):
     monkeypatch.setattr(correo_router, "_mail_ready", lambda: None)
-    data = payload()
+    data = preparar_borrador(payload())
     data["perfil"]["email"] = "otro@example.com"
     assert request("POST", "/api/correo/enviar-recordatorio", json=data).status_code == 403
 
@@ -157,6 +181,7 @@ def test_correo_verificado_contiene_obligacion_y_anio_correctos(monkeypatch):
     correo_router.solicitar_codigo(correo_router.SolicitarCodigo(email=email))
     datos = payload(code=codigo_emitido[0], email=email)
     datos.update(codigo_obligacion="IVA_SEMESTRAL_2", anio=2027)
+    preparar_borrador(datos)
     resultado = correo_router.enviar_recordatorio(correo_router.EnviarRecordatorioVerificado(**datos))
 
     assert resultado.exito is True

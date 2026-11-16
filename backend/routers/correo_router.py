@@ -13,6 +13,7 @@ from pydantic import BaseModel, EmailStr, Field
 from backend.schemas import PerfilTributarioCreate
 from backend.services.agent_service import AgenteTributarioRIMPE, ResultadoAgente
 from backend.services.mailjet_service import MailjetError, MailjetUncertainError, configurado, enviar_correo
+from backend.services.reminder_drafts import prepare_draft, check_draft, take_draft
 
 
 router = APIRouter(prefix="/api/correo", tags=["Envío puntual verificado"])
@@ -34,7 +35,16 @@ class EnviarRecordatorioVerificado(BaseModel):
     perfil: PerfilTributarioCreate
     anio: int = Field(default=2026, ge=2024, le=2030)
     codigo_obligacion: str = Field(min_length=3)
+    borrador_id: str = Field(min_length=20)
     confirmacion_envio: bool
+
+
+class PrepararRecordatorio(BaseModel):
+    email: EmailStr
+    perfil: PerfilTributarioCreate
+    anio: int = Field(default=2026, ge=2024, le=2030)
+    codigo_obligacion: str = Field(min_length=3)
+    explicacion_id: str = Field(min_length=20)
 
 
 def _email_key(email: str) -> str:
@@ -73,6 +83,18 @@ def _send_code(email: str, code: str):
     )
 
 
+@router.post("/preparar-recordatorio")
+def preparar_recordatorio(payload: PrepararRecordatorio):
+    email = str(payload.email).lower()
+    if str(payload.perfil.email).lower() != email:
+        raise HTTPException(403, "El destinatario no coincide con el perfil temporal.")
+    try:
+        return prepare_draft(payload.explicacion_id, payload.perfil, email,
+                             payload.anio, payload.codigo_obligacion)
+    except ValueError:
+        raise HTTPException(422, "La explicación o el perfil no son válidos; regenera el contenido.")
+
+
 @router.post("/solicitar-codigo")
 def solicitar_codigo(payload: SolicitarCodigo):
     _mail_ready()
@@ -108,6 +130,10 @@ def enviar_recordatorio(payload: EnviarRecordatorioVerificado):
     if str(payload.perfil.email).lower() != email:
         raise HTTPException(403, "El correo verificado no coincide con el destinatario.")
     _mail_ready()
+    try:
+        check_draft(payload.borrador_id, payload.perfil, email, payload.anio, payload.codigo_obligacion)
+    except ValueError:
+        raise HTTPException(422, "El borrador caducó o cambió; revísalo de nuevo.")
     key = _email_key(email)
     now = time.monotonic()
     with _lock:
@@ -126,6 +152,10 @@ def enviar_recordatorio(payload: EnviarRecordatorioVerificado):
         sent = _sent.get(key, [])
         if len(sent) >= 3 or (sent and sent[-1] > now - 60):
             raise HTTPException(429, "Ya se solicitó un recordatorio para este correo recientemente.")
+        try:
+            draft = take_draft(payload.borrador_id, payload.perfil, email, payload.anio, payload.codigo_obligacion)
+        except ValueError:
+            raise HTTPException(422, "El borrador caducó; revísalo de nuevo.")
         _pending.pop(key, None)
         sent.append(now)
         _sent[key] = sent
@@ -137,5 +167,6 @@ def enviar_recordatorio(payload: EnviarRecordatorioVerificado):
         perfil=perfil,
         confirmacion_envio=True,
         codigo_obligacion=payload.codigo_obligacion,
+        recordatorio_preparado=draft,
     )
     return resultado

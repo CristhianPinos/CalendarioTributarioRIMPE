@@ -8,7 +8,7 @@ El ajuste visual posterior [`30fab35`](https://github.com/CristhianPinos/Calenda
 
 ## Problema y solución
 
-Los vencimientos dependen del noveno dígito del RUC, el régimen, el período y los días inhábiles. Una fecha incorrecta puede inducir a incumplimiento. El motor Python calcula fechas y montos a partir de [`config/`](config/). Gemini redacta explicaciones; el RAG aporta citas de los documentos procesados. El envío puntual requiere confirmar la acción y verificar el correo destinatario con un código temporal.
+Los vencimientos dependen del noveno dígito del RUC, el régimen, el período y los días inhábiles. Una fecha incorrecta puede inducir a incumplimiento. El motor Python calcula fechas y montos a partir de [`config/`](config/). Gemini redacta explicaciones con una fuente normativa recuperada; si esta o el modelo no están disponibles, se usa el catálogo de contingencia. El envío puntual requiere revisar el texto del recordatorio, verificar el correo destinatario con un código temporal y confirmar la acción.
 
 ```mermaid
 flowchart LR
@@ -16,12 +16,13 @@ flowchart LR
   API --> CALC[Cálculo Python]
   API --> RAG[RAG sobre artículos]
   API --> GEM[Gemini o catálogo de contingencia]
-  API --> OTP[Verificación temporal del correo]
+  API --> PRE[Vista previa del recordatorio]
+  PRE --> OTP[Verificación temporal del correo]
   OTP --> HITL[Confirmación del usuario]
   HITL --> Mailjet[Mailjet API HTTPS]
 ```
 
-Las fechas nunca las calcula el modelo. El calendario y los próximos vencimientos aparecen después de completar los tres pasos del perfil y pulsar «Generar Calendario Oficial». El perfil se utiliza durante la sesión para generar el calendario y el recordatorio, sin guardarse. El código de correo vence en diez minutos y se consume una sola vez. El escaneo individual y la cola histórica quedan fuera de la API pública de esta versión.
+Las fechas nunca las calcula el modelo. El calendario y los próximos vencimientos aparecen después de completar los tres pasos del perfil y pulsar «Generar Calendario Oficial». El perfil se utiliza durante la sesión para generar el calendario y el recordatorio, sin guardarse. Al abrir una obligación, el servidor conserva temporalmente su explicación y prepara un borrador vinculado al perfil, la fecha calculada y el destinatario. La vista previa muestra el asunto y el texto que Mailjet recibirá. El borrador caduca a los 15 minutos; el código de correo vence en diez minutos. Ambos se consumen una sola vez. Un reinicio de Render obliga a repetir la revisión y la verificación. El escaneo individual y la cola histórica quedan fuera de la API pública de esta versión.
 
 La ruta experimental `POST /api/agente/ejecutar` puede pedir a Gemini que elija la siguiente herramienta dentro de una lista cerrada calculada por Python. El backend valida cada elección, limita el número de pasos y registra si decidió Gemini o el flujo seguro. No envía correos desde esa ruta: el despacho puntual conserva la verificación del destinatario y la confirmación humana en `/api/correo`, sin depender de una llamada al modelo después de consumir el código. Si Gemini no responde, el agente completa el recorrido seguro.
 

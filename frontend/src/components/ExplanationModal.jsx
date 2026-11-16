@@ -22,7 +22,7 @@ import {
   ExternalLink,
   Lock,
 } from "lucide-react";
-import { obtenerExplicacion, solicitarCodigoCorreo, enviarRecordatorioVerificado } from "../services/apiClient";
+import { obtenerExplicacion, prepararRecordatorio, solicitarCodigoCorreo, enviarRecordatorioVerificado } from "../services/apiClient";
 
 // Incluye el posible arranque en frío de Render Free y el límite del backend.
 const EXPLANATION_TIMEOUT_MS = 90_000;
@@ -39,6 +39,7 @@ export default function ExplanationModal({
   const [explicacionData, setExplicacionData] = useState(null);
   const requestControllerRef = useRef(null);
   const requestIdRef = useRef(0);
+  const draftRequestIdRef = useRef(0);
   const [esDeclaracionEnCero, setEsDeclaracionEnCero] = useState(false);
 
   // Estados de la Compuerta HITL (Human-in-the-Loop) y Agente Autónomo
@@ -51,12 +52,15 @@ export default function ExplanationModal({
   const [codigo, setCodigo] = useState("");
   const [codigoSolicitado, setCodigoSolicitado] = useState(false);
   const [solicitandoCodigo, setSolicitandoCodigo] = useState(false);
+  const [borrador, setBorrador] = useState(null);
+  const [preparandoBorrador, setPreparandoBorrador] = useState(false);
 
   // Cargar explicación cada vez que se abre el modal con una nueva obligación
   useEffect(() => {
     if (!isOpen || !obligacion) {
       requestControllerRef.current?.abort();
       requestIdRef.current += 1;
+      draftRequestIdRef.current += 1;
       setCargando(false);
       setEsperaProlongada(false);
       setExplicacionData(null);
@@ -68,6 +72,8 @@ export default function ExplanationModal({
       setCodigo("");
       setCodigoSolicitado(false);
       setEmailDestino("");
+      setBorrador(null);
+      setEsDeclaracionEnCero(false);
       return;
     }
 
@@ -106,13 +112,19 @@ export default function ExplanationModal({
     setEsperaProlongada(false);
     setError(null);
     setExplicacionData(null);
+    draftRequestIdRef.current += 1;
+    setBorrador(null);
+    setCodigo("");
+    setCodigoSolicitado(false);
+    setConfirmadoPorUsuario(false);
 
     try {
       const payload = {
         codigo_obligacion: obligacion.codigo_obligacion,
         tipo_regimen: perfil.tipo_regimen,
         fecha_vencimiento: obligacion.fecha_vencimiento,
-        es_declaracion_en_cero: enCero,
+        tiene_actividades_excluidas: Boolean(perfil.tiene_actividades_excluidas),
+        es_declaracion_en_cero: enCero && ["IVA_SEMESTRAL_1", "IVA_SEMESTRAL_2"].includes(obligacion.codigo_obligacion),
       };
 
       const res = await obtenerExplicacion(payload, { signal: controller.signal });
@@ -137,7 +149,7 @@ export default function ExplanationModal({
   };
 
   const handleSolicitarCodigo = async () => {
-    if (!emailDestino.trim()) return;
+    if (!emailDestino.trim() || !borrador) return;
     setSolicitandoCodigo(true);
     setErrorEnvio(null);
     try {
@@ -151,9 +163,41 @@ export default function ExplanationModal({
     }
   };
 
+  const perfilCorreo = () => ({
+    ruc: perfil.ruc,
+    razon_social: perfil.razon_social,
+    tipo_regimen: perfil.tipo_regimen,
+    email: emailDestino.trim(),
+    tiene_actividades_excluidas: Boolean(perfil.tiene_actividades_excluidas),
+  });
+
+  const handlePrepararBorrador = async () => {
+    if (!emailDestino.trim() || !explicacionData?.explicacion_id) return;
+    const draftRequestId = ++draftRequestIdRef.current;
+    const recipient = emailDestino.trim();
+    setPreparandoBorrador(true);
+    setErrorEnvio(null);
+    setBorrador(null);
+    setCodigo("");
+    setCodigoSolicitado(false);
+    setConfirmadoPorUsuario(false);
+    try {
+      const res = await prepararRecordatorio({
+        email: recipient, perfil: perfilCorreo(), anio: perfil.anio || 2026,
+        codigo_obligacion: obligacion.codigo_obligacion,
+        explicacion_id: explicacionData.explicacion_id,
+      });
+      if (draftRequestId === draftRequestIdRef.current) setBorrador(res.data);
+    } catch (err) {
+      if (draftRequestId === draftRequestIdRef.current) setErrorEnvio(err.message || "No se pudo preparar el correo.");
+    } finally {
+      if (draftRequestId === draftRequestIdRef.current) setPreparandoBorrador(false);
+    }
+  };
+
   const handleProgramarRecordatorio = async (e) => {
     e.preventDefault();
-    if (!confirmadoPorUsuario || !emailDestino.trim() || !/^\d{6}$/.test(codigo)) return;
+    if (!confirmadoPorUsuario || !borrador || !emailDestino.trim() || !/^\d{6}$/.test(codigo)) return;
 
     setEnviandoHitl(true);
     setErrorEnvio(null);
@@ -163,23 +207,28 @@ export default function ExplanationModal({
         email: emailDestino.trim(),
         codigo,
         codigo_obligacion: obligacion.codigo_obligacion,
-        perfil: {
-          ruc: perfil.ruc,
-          razon_social: perfil.razon_social,
-          tipo_regimen: perfil.tipo_regimen,
-          email: emailDestino.trim(),
-          tiene_actividades_excluidas: Boolean(perfil.tiene_actividades_excluidas),
-        },
+        perfil: perfilCorreo(),
         anio: perfil.anio || 2026,
+        borrador_id: borrador.borrador_id,
       });
 
       if (!res.data.exito) {
+        setBorrador(null);
+        setCodigo("");
+        setCodigoSolicitado(false);
+        setConfirmadoPorUsuario(false);
         throw new Error(res.data.respuesta_final || "No se pudo completar la operación.");
       }
       setResultadoAgente(res.data);
       setRecordatorioProgramado(true);
       setCodigo("");
     } catch (err) {
+      if (err.status === 422) {
+        setBorrador(null);
+        setCodigo("");
+        setCodigoSolicitado(false);
+        setConfirmadoPorUsuario(false);
+      }
       setErrorEnvio(
         err.message || "No se pudo procesar la ejecución del agente tributario."
       );
@@ -473,9 +522,13 @@ export default function ExplanationModal({
                           required
                           value={emailDestino}
                           onChange={(e) => {
+                            draftRequestIdRef.current += 1;
+                            setPreparandoBorrador(false);
                             setEmailDestino(e.target.value);
+                            setBorrador(null);
                             setCodigo("");
                             setCodigoSolicitado(false);
+                            setConfirmadoPorUsuario(false);
                           }}
                           placeholder="tu-correo@empresa.ec"
                           className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-100 outline-none"
@@ -484,8 +537,21 @@ export default function ExplanationModal({
                       </div>
                     </div>
 
+                    <button type="button" onClick={handlePrepararBorrador}
+                      disabled={preparandoBorrador || !emailDestino.trim() || !explicacionData?.explicacion_id}
+                      className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-800 disabled:opacity-50">
+                      {preparandoBorrador ? "Preparando correo..." : borrador ? "Actualizar vista previa" : "Revisar correo antes de enviarlo"}
+                    </button>
+                    {borrador && (
+                      <section aria-label="Vista previa exacta del recordatorio" className="rounded-xl border border-blue-200 bg-white p-3 text-xs">
+                        <p className="font-bold text-slate-800 mb-2">Vista previa del correo para {emailDestino.trim()}</p>
+                        <p className="font-semibold text-blue-900 mb-2">Asunto: {borrador.asunto}</p>
+                        <pre className="whitespace-pre-wrap break-words font-sans text-slate-700 max-h-72 overflow-y-auto">{borrador.cuerpo}</pre>
+                      </section>
+                    )}
+
                     <div className="space-y-2">
-                      <button type="button" onClick={handleSolicitarCodigo} disabled={solicitandoCodigo || !emailDestino.trim()}
+                      <button type="button" onClick={handleSolicitarCodigo} disabled={solicitandoCodigo || !borrador}
                         className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-800 disabled:opacity-50">
                         {solicitandoCodigo ? "Enviando código..." : codigoSolicitado ? "Solicitar otro código" : "Enviar código de verificación"}
                       </button>
@@ -507,16 +573,16 @@ export default function ExplanationModal({
                         className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 mt-0.5 cursor-pointer"
                       />
                       <span className="text-xs text-slate-700 leading-snug">
-                        <strong>Confirmo expresamente</strong> que he revisado las fechas y condiciones de esta
-                        obligación tributaria y autorizo la ejecución del agente y despacho a mi correo.
+                        <strong>Confirmo expresamente</strong> que he revisado la vista previa del recordatorio,
+                        las fechas y condiciones de esta obligación tributaria y autorizo su despacho a mi correo.
                       </span>
                     </label>
 
                     <button
                       type="submit"
-                      disabled={!confirmadoPorUsuario || !emailDestino.trim() || !/^\d{6}$/.test(codigo) || enviandoHitl}
+                      disabled={!borrador || !confirmadoPorUsuario || !emailDestino.trim() || !/^\d{6}$/.test(codigo) || enviandoHitl}
                       className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
-                        confirmadoPorUsuario && emailDestino.trim() && /^\d{6}$/.test(codigo) && !enviandoHitl
+                        borrador && confirmadoPorUsuario && emailDestino.trim() && /^\d{6}$/.test(codigo) && !enviandoHitl
                           ? "bg-blue-700 hover:bg-blue-800 text-white shadow-sm hover:shadow cursor-pointer"
                           : "bg-slate-300 text-slate-500 cursor-not-allowed"
                       }`}

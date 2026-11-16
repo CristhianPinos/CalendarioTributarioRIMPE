@@ -18,6 +18,7 @@ from backend.schemas import (
 from backend.services.llm import generar_explicacion_obligacion, FALLBACK_OBLIGACIONES
 from backend.services.calculator import simular_cuota_renta
 from backend.services.rate_limit import limit_explanation_requests
+from backend.services.reminder_drafts import remember_explanation
 
 router = APIRouter(prefix="/api", tags=["Obligaciones & IA"])
 
@@ -39,7 +40,9 @@ def explicar_obligacion(
 ) -> ExplicacionObligacionResponse:
     """Endpoint que genera la explicación con el modelo generativo."""
     try:
-        return generar_explicacion_obligacion(request=request)
+        response = generar_explicacion_obligacion(request=request)
+        response.explicacion_id = remember_explanation(request, response)
+        return response
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -270,6 +270,8 @@ class ExplicacionObligacionRequest(BaseModel):
 class ExplicacionObligacionResponse(BaseModel):
     """Respuesta del endpoint con la explicación estructurada generada por Gemini."""
     obligacion: RecordatorioEstructurado
+    explicacion_id: Optional[str] = None
+    fuentes_rag: List[str] = Field(default_factory=list)
     modelo_utilizado: str = Field(
         default="gemini-2.0-flash",
         description="Nombre exacto del modelo generativo utilizado."
