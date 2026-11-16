@@ -65,6 +65,8 @@ La fuente de esta sección es «Progreso del Proyecto Grupo 11.pdf», entregado 
 | Versión corregida (`37d3c07`) | [CI aprobado](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462), `/health` con el mismo SHA, 18/18 casos HTTP; Hit@3 de 16/16 y fuente y artículo 5/5 en [Render](../../07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02). | La muestra curada y las pruebas sintéticas no constituyen una auditoría jurídica completa. |
 | Revisión visual pública | Se comprobó el perfil, el calendario, el desplazamiento horizontal del vencimiento y su modal en escritorio, tableta y móviles de 390 y 320 px. El ajuste `30fab35` pasó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43521418406) y `/health` identificó ese SHA en Render. | La revisión cubre esos tamaños y un perfil ficticio; no equivale a probar todos los dispositivos ni proveedores de correo. |
 | Integraciones externas | Flash Lite produjo una explicación real en Render; el usuario recibió el código y el recordatorio en Gmail. | La disponibilidad futura de Gemini y la entrega futura de Mailjet no quedan garantizadas por una prueba puntual. |
+| Comprobación pública del 16 de noviembre (`062dda4`) | [CI aprobado](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43955040154), `/health` con el mismo SHA y 18/18 casos aprobados contra la URL pública. | La batería usa perfiles sintéticos y no envía correos; la captura del correo recibido documenta una prueba manual distinta. |
+| Recuperación del RAG tras reinicio (`5c347a2`) | [CI aprobado](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43966704682): misma imagen Docker, PID nuevo y consulta normativa con tres fragmentos y cita directa de la LRTI, art. 97.9, antes y después de `docker restart`. Render respondió la misma consulta tras desplegar el nuevo SHA. | En Render se verificó un despliegue nuevo; el reinicio de la misma imagen se comprobó en CI. La consulta es sintética y no requiere correo, perfil ni Gemini. |
 
 La [evaluación detallada](../../07-evaluacion.md) conserva por separado las mediciones históricas y el [resultado JSON de la versión corregida](../../../eval/resultados_37d3c07_render.json). El despliegue `37d3c07` sustituyó a `414bc44` tras aprobar CI; ambos tienen evidencias vinculadas a su propio SHA.
 
@@ -72,19 +74,29 @@ La [evaluación detallada](../../07-evaluacion.md) conserva por separado las med
 
 ## 4. Capturas de pantalla
 
-**Aplicación ya desplegada funcionado correctamente.** Las capturas muestran la vista inicial, el calendario generado, el modal, la autorización, la aceptación del envío por Mailjet, el correo recibido y el simulador. Son evidencia visual de la demostración; los resultados medidos y sus límites constan en las secciones anteriores. En las capturas de verificación y aceptación del envío se ocultaron el correo y el código temporal antes de incorporarlas al repositorio.
+**Comprobaciones del despliegue.** El 16 de noviembre, `/health` informó el commit `062dda46254d37d56a406b30680072f5afe94969`; la [corrida de CI correspondiente](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43955040154) terminó correctamente y `scripts/production_checks.py` aprobó 18/18 casos sobre la URL pública. La tercera captura de este bloque muestra un resumen visual extraído del informe generado por ese script; no representa una prueba de entrega de correo.
 
-![Aplicación desplegada: vista inicial](capturas/app-inicio.png)
+La comprobación posterior del índice normativo tras reiniciar el contenedor consta en los [logs del CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43966704682) y en su [artefacto de respuestas y procesos](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43966704682/artifacts/14276996334). El procedimiento, los resultados y el alcance de la comparación con Render se detallan en [Pruebas](../../08-pruebas.md#recuperación-del-índice-rag-después-de-reiniciar-el-contenedor).
 
-![Aplicación desplegada: calendario y resumen del perfil](capturas/app-calendario.png)
+![Respuesta pública de /health con SHA del despliegue](capturas/health-render.png)
 
-![Aplicación desplegada: verificación de código con datos ocultos](capturas/app-verificacion-codigo-oculto.png)
+![Pipeline CI aprobado para el mismo commit](capturas/ci-aprobado.png)
 
-![Aplicación desplegada: aceptación de Mailjet con correo oculto](capturas/app-envio-mailjet-correo-oculto.png)
+![Resultado de 18 pruebas contra la URL pública](capturas/pruebas-url-publica.png)
 
-![Aplicación desplegada: correo de recordatorio recibido](capturas/app-correo-recordatorio.png)
+**Aplicación ya desplegada funcionando correctamente.** Las seis capturas adjuntadas por el equipo muestran, en orden, la vista inicial, el calendario generado, la vista previa y verificación, la aceptación del envío por Mailjet, el correo recibido y el simulador. Son evidencia visual de una demostración puntual. Se taparon únicamente el correo y el código temporal de la tercera captura, y el destinatario de la cuarta, antes de incorporarlas al repositorio.
 
-![Aplicación desplegada: simulador de renta](capturas/app-simulador.png)
+[![Aplicación desplegada: vista inicial](capturas/app-inicio.png)](capturas/app-inicio.png)
+
+[![Aplicación desplegada: calendario y resumen del perfil](capturas/app-calendario.png)](capturas/app-calendario.png)
+
+[![Aplicación desplegada: verificación de código con datos ocultos](capturas/app-verificacion-codigo-oculto.png)](capturas/app-verificacion-codigo-oculto.png)
+
+[![Aplicación desplegada: aceptación de Mailjet con correo oculto](capturas/app-envio-mailjet-correo-oculto.png)](capturas/app-envio-mailjet-correo-oculto.png)
+
+[![Aplicación desplegada: correo de recordatorio recibido](capturas/app-correo-recordatorio.png)](capturas/app-correo-recordatorio.png)
+
+[![Aplicación desplegada: simulador de renta](capturas/app-simulador.png)](capturas/app-simulador.png)
 
 **Estructura de directorios y archivos del proyecto en la semana 4.**
 
