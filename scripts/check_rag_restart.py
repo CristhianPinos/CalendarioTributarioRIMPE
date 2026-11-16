@@ -36,7 +36,7 @@ def comprobar(base_url: str) -> dict:
         try:
             salud = solicitar_json(f"{base_url}/health")
             break
-        except (HTTPError, URLError, TimeoutError) as error:
+        except (HTTPError, URLError, OSError) as error:
             ultimo_error = error
             time.sleep(2)
     else:
