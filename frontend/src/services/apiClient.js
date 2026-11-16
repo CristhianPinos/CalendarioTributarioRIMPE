@@ -153,6 +153,16 @@ export async function calcularCalendario(perfilData) {
   });
 }
 
+export async function consultarAlertas(calendarioData) {
+  const params = new URLSearchParams({
+    noveno_digito: String(calendarioData.noveno_digito),
+    tipo_regimen: calendarioData.tipo_regimen,
+    anio: String(calendarioData.anio_fiscal),
+    tiene_actividades_excluidas: String(Boolean(calendarioData.tiene_actividades_excluidas)),
+  });
+  return apiRequest(`/api/calendario/alertas?${params.toString()}`);
+}
+
 /**
  * Obtiene la explicación pedagógica generada con IA (Google Gemini Flash) o catálogo de contingencia.
  * @param {Object} payload { codigo_obligacion, tipo_regimen, fecha_vencimiento, es_declaracion_en_cero }

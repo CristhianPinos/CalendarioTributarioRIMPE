@@ -115,28 +115,26 @@ def trasladar_al_siguiente_dia_habil(fecha_nominal: date, feriados: List[Dict[st
     return fecha_actual, True, motivo_str
 
 
-def calcular_vencimientos(
-    ruc: str,
+def calcular_vencimientos_por_digito(
+    noveno_digito: int,
     tipo_regimen: str,
     anio: int,
     tiene_actividades_excluidas: bool = False,
     config_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Función central del motor determinista exigida por el caso de estudio.
-    Calcula todas las obligaciones tributarias anuales y semestrales del contribuyente
-    en base a su noveno dígito de RUC y régimen RIMPE.
+    Núcleo del calendario por noveno dígito, sin datos identificables.
     """
-    if not validar_ruc_persona_natural(ruc):
-        raise ValueError("El RUC ingresado no cumple con el algoritmo Módulo 10 para personas naturales del SRI.")
+    if type(noveno_digito) is not int or not 0 <= noveno_digito <= 9:
+        raise ValueError("Noveno dígito inválido.")
 
     regimenes_validos = ["RIMPE_NEGOCIO_POPULAR", "RIMPE_EMPRENDEDOR"]
     if tipo_regimen not in regimenes_validos:
         raise ValueError(f"Tipo de régimen inválido. Debe ser uno de: {regimenes_validos}")
 
     reglas = cargar_reglas_sri(config_path)
-    noveno_digito_str = ruc[8]
-    noveno_digito_int = int(noveno_digito_str)
+    noveno_digito_str = str(noveno_digito)
+    noveno_digito_int = noveno_digito
 
     calendario_digito = reglas.get("calendario_noveno_digito", {})
     dia_base = calendario_digito.get(noveno_digito_str)
@@ -263,7 +261,6 @@ def calcular_vencimientos(
     eventos.sort(key=lambda x: x["fecha_vencimiento"])
 
     return {
-        "ruc": ruc,
         "noveno_digito": noveno_digito_int,
         "tipo_regimen": tipo_regimen,
         "anio_fiscal": anio,
@@ -271,6 +268,22 @@ def calcular_vencimientos(
         "total_obligaciones": len(eventos),
         "eventos": eventos
     }
+
+
+def calcular_vencimientos(
+    ruc: str,
+    tipo_regimen: str,
+    anio: int,
+    tiene_actividades_excluidas: bool = False,
+    config_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Valida el RUC y conserva el contrato público del calendario."""
+    if not validar_ruc_persona_natural(ruc):
+        raise ValueError("El RUC ingresado no cumple con el algoritmo Módulo 10 para personas naturales del SRI.")
+    resultado = calcular_vencimientos_por_digito(
+        int(ruc[8]), tipo_regimen, anio, tiene_actividades_excluidas, config_path
+    )
+    return {"ruc": ruc, **resultado}
 
 
 def simular_cuota_renta(ingresos_brutos: float, tipo_regimen: str, config_path: Optional[str] = None) -> Dict[str, Any]:

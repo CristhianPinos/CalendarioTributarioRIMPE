@@ -241,3 +241,13 @@ Render Free bloquea los puertos SMTP habituales. El remitente institucional indi
 La revisión académica observó que el bucle del agente seguía un orden fijo decidido por `if/elif`, aunque la documentación lo llamaba selección dinámica. En la ruta `/api/agente/ejecutar`, Gemini puede proponer la siguiente herramienta entre las que Python habilita según las dependencias del estado. Python verifica que la propuesta pertenezca a esa lista, construye los parámetros y ejecuta las herramientas. No se envían al selector la instrucción libre ni RUC, nombre, correo o importes. Ante una respuesta inválida, falta de clave o error del proveedor, se usa el orden seguro comprobado. Las trazas registran herramienta, candidatas y origen de la selección; no el razonamiento libre del modelo.
 
 El agente tiene máximo de iteraciones y la ruta comparte la cuota generativa, reservando cuatro llamadas posibles por ejecución. La ruta del agente rechaza envíos; el envío real conserva el código de un solo uso y la confirmación en `/api/correo`. Ese flujo usa el orden determinista para que una caída de Gemini no desperdicie un código ya consumido. La selección del modelo no calcula fechas ni montos y no puede autorizar un destinatario. Las pruebas cubren elección válida, elección prohibida, fallo de Gemini, orden alternativo, cuota y compuerta HITL. En Render, una ejecución sintética registró tres herramientas elegidas con origen `gemini` y dejó el envío pendiente de confirmación.
+
+---
+
+## ADR-013: Escaneo diario general sin perfiles persistidos
+
+**Fecha:** Noviembre de 2026. **Estado:** Implementado en código; activación programada sujeta a configurar el secreto compartido.
+
+El escaneo histórico conserva RUC, nombre, correo y una cola individual; no es compatible con la demostración pública sin perfiles guardados. Se separó el cálculo de fechas por noveno dígito del RUC completo y se prepara una matriz general de 40 combinaciones de dígito, régimen y actividades excluidas. Solo se retienen alertas sin identidad durante la vida del proceso. La API consulta una combinación tras generar el perfil en la sesión. La notificación abre el modal existente y nunca despacha correo sin verificación y consentimiento.
+
+GitHub Actions dispara una revisión diaria mediante un endpoint protegido por `SCAN_TRIGGER_TOKEN`. Render Free puede suspenderse y GitHub puede retrasar el trabajo; una consulta reconstruye la matriz si cambió el día o se perdió la memoria. Esto no equivale a avisos individuales mientras el usuario está ausente. El planificador histórico sigue desactivado. El escaneo usa exclusivamente el ejercicio normativo configurado y no extrapola a otro ejercicio.

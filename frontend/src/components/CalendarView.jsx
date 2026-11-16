@@ -31,6 +31,7 @@ import {
 
 export default function CalendarView({
   calendarioData,
+  alertas = [],
   onSelectObligacion,
   cargando,
 }) {
@@ -240,6 +241,32 @@ export default function CalendarView({
           </div>
         </div>
       </div>
+
+      {alertas.length > 0 && (
+        <section aria-label="Alertas de vencimiento cercano" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:p-5">
+          <h3 className="flex items-center gap-2 font-bold text-amber-950 mb-3">
+            <AlertTriangle className="w-5 h-5" /> Vencimientos cercanos
+          </h3>
+          <div className="space-y-2">
+            {alertas.map(({ evento, dias_habiles_restantes, vence_hoy }) => (
+              <button
+                key={`${evento.codigo_obligacion}-${evento.fecha_vencimiento}`}
+                type="button"
+                onClick={() => onSelectObligacion(evento)}
+                className="w-full text-left rounded-xl border border-amber-200 bg-white px-3 py-2 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-blue-600"
+              >
+                <span className="block font-semibold text-slate-900">{evento.titulo}</span>
+                <span className="text-sm text-amber-900">
+                  Vence el {evento.fecha_vencimiento} · {vence_hoy
+                    ? "vence hoy" : dias_habiles_restantes === 0
+                    ? "vence el próximo día hábil" : `faltan ${dias_habiles_restantes} ${dias_habiles_restantes === 1 ? "día hábil" : "días hábiles"}`}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-amber-900 mt-3">La alerta es informativa. El correo solo se envía si lo autorizas en el detalle.</p>
+        </section>
+      )}
 
       {/* Calendario y lista de vencimientos */}
       <div className="space-y-5">

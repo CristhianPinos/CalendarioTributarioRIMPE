@@ -422,4 +422,8 @@ La tarifa hipotética se comprueba localmente con `backend/tests/test_config_loa
 
 ## Alcance de la compuerta HITL
 
-F4-14 comprueba la respuesta de la herramienta individual en el commit histórico `84cc378`: sin confirmación no llegaba al despacho SMTP ni añadía una fila a la cola. En el flujo público posterior, el correo puntual usa Mailjet HTTPS y exige código temporal y confirmación. Las rutas históricas de cola y escaneo periódico ya no están montadas. F4-14 no prueba la entrega real; la recepción del código y del recordatorio en la demo se documenta arriba.
+F4-14 comprueba la respuesta de la herramienta individual en el commit histórico `84cc378`: sin confirmación no llegaba al despacho SMTP ni añadía una fila a la cola. En el flujo público posterior, el correo puntual usa Mailjet HTTPS y exige código temporal y confirmación. Las rutas históricas de cola y escaneo individual ya no están montadas. F4-14 no prueba la entrega real; la recepción del código y del recordatorio en la demo se documenta arriba.
+
+## Escaneo general de vencimientos cercanos (verificación local)
+
+El nuevo escaneo general se probó localmente con `python -m pytest backend/tests/test_calculator.py backend/tests/test_periodic_scan.py backend/tests/test_daily_alerts.py -q`: **83 pruebas aprobadas**. La prueba del 18 de enero de 2027 detecta que el IVA del segundo semestre del ejercicio 2026 para noveno dígito 8 vence el 25 de enero, a cinco días hábiles. También se verifican la equivalencia del cálculo por dígito con el calendario público, las 40 combinaciones, el cambio de fecha, la ausencia de identificadores en las alertas y el rechazo del disparador sin secreto. `npm run build` compiló el frontend. Esto no acredita aún la ejecución de GitHub Actions ni la nueva interfaz en Render; ambas requieren publicar y configurar `SCAN_TRIGGER_TOKEN` en GitHub y Render.

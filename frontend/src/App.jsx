@@ -11,12 +11,13 @@ import CalendarView from "./components/CalendarView";
 import ExplanationModal from "./components/ExplanationModal";
 import TaxSimulatorModal from "./components/TaxSimulatorModal";
 import Footer from "./components/Footer";
-import { calcularCalendario } from "./services/apiClient";
+import { calcularCalendario, consultarAlertas } from "./services/apiClient";
 import { CheckCircle2, Sparkles, Shield } from "lucide-react";
 
 export default function App() {
   const [calendario, setCalendario] = useState(null);
   const [perfilActivo, setPerfilActivo] = useState(null);
+  const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [errorBackend, setErrorBackend] = useState(null);
 
@@ -30,6 +31,7 @@ export default function App() {
     setErrorBackend(null);
     setCalendario(null);
     setPerfilActivo(null);
+    setAlertas([]);
     setObligacionSeleccionada(null);
     setModalExplicacionAbierto(false);
 
@@ -37,6 +39,20 @@ export default function App() {
       const res = await calcularCalendario(perfilData);
       setCalendario(res.data);
       setPerfilActivo(perfilData);
+      try {
+        const result = await consultarAlertas(res.data);
+        const matching = result.data.alertas.flatMap((alerta) => {
+          const evento = res.data.eventos.find((item) =>
+            item.codigo_obligacion === alerta.codigo_obligacion &&
+            item.fecha_vencimiento === alerta.fecha_vencimiento
+          );
+          return evento ? [{ ...alerta, evento }] : [];
+        });
+        setAlertas(matching);
+      } catch (alertError) {
+        // El calendario sigue funcionando si falla el servicio de alertas.
+        console.warn("No se pudieron consultar las alertas de vencimiento.");
+      }
     } catch (err) {
       console.error("Error al calcular calendario:", err);
       setErrorBackend(
@@ -134,6 +150,7 @@ export default function App() {
           <div className="lg:col-span-8">
             <CalendarView
               calendarioData={calendario}
+              alertas={alertas}
               onSelectObligacion={handleSeleccionarObligacion}
               cargando={cargando}
             />

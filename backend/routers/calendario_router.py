@@ -9,8 +9,10 @@ Expone los endpoints para:
 - Consulta de catálogo oficial de feriados nacionales.
 """
 
+import hmac
+import os
 from typing import Dict, Any, List
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Header, status
 from pydantic import BaseModel, Field
 
 from backend.schemas import (
@@ -23,11 +25,38 @@ from backend.services.calculator import (
     validar_ruc_persona_natural,
     cargar_reglas_sri
 )
+from backend.services.daily_alerts import alerts_for_profile, scan_alerts
 
 router = APIRouter(
     prefix="/api",
     tags=["Calendario"]
 )
+
+
+@router.get("/calendario/alertas")
+def consultar_alertas(noveno_digito: int, tipo_regimen: str, anio: int,
+                     tiene_actividades_excluidas: bool = False):
+    """Consulta alertas generales sin enviar ni almacenar datos personales."""
+    try:
+        return alerts_for_profile(noveno_digito, tipo_regimen,
+                                  tiene_actividades_excluidas, anio)
+    except ValueError:
+        raise HTTPException(422, "Parámetros de alerta no válidos para el ejercicio configurado.")
+
+
+@router.post("/calendario/alertas/escanear")
+def ejecutar_escaneo(x_scan_token: str | None = Header(default=None)):
+    """Disparador protegido del trabajo diario; nunca despacha mensajes."""
+    expected = os.getenv("SCAN_TRIGGER_TOKEN", "")
+    if not expected:
+        raise HTTPException(503, "Escaneo programado no configurado.")
+    if not x_scan_token or not hmac.compare_digest(x_scan_token, expected):
+        raise HTTPException(403, "Acceso denegado.")
+    result = scan_alerts()
+    return {"fecha_escaneo": result["fecha_escaneo"],
+            "anio_fiscal": result["anio_fiscal"],
+            "combinaciones_evaluadas": len(result["alertas"]),
+            "alertas_preparadas": sum(map(len, result["alertas"].values()))}
 
 
 class ValidacionRucRequest(BaseModel):
