@@ -105,3 +105,11 @@
 | Herramientas, HITL e Inyección | `backend/tests/test_agent_tools.py` | 12 | 0.25s | **Aprobado** |
 | Flujo Programado Diario | `backend/tests/test_scheduler.py` | 5 | 0.19s | **Aprobado** |
 | **Total Fase 3** | **5 archivos de prueba** | **35 casos** | **0.92s** | **100% Verde** |
+
+---
+
+## 3. Capturas de pantalla
+
+**Estructura de directorios y archivos del proyecto en la semana 3.**
+
+![Estructura del proyecto en la semana 3](capturas/estructura-semana-3.png)

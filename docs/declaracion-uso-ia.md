@@ -2,7 +2,7 @@
 
 **Proyecto:** Calendario Tributario RIMPE, Caso N.º 11 – Grupo 11  
 **Integrantes:** Juan Lucumi (Desarrollador A) y Cristhian Pinos (Desarrollador B)  
-**Estado:** documentación del cierre de fase 4; las correcciones locales posteriores al commit público `414bc44` se distinguen de las pruebas realizadas en Render.
+**Estado:** documentación del cierre de fase 4; las verificaciones locales y públicas se identifican por separado en los informes de pruebas.
 
 ## Uso en la aplicación
 
@@ -13,13 +13,13 @@
 
 ## Uso de IA durante el desarrollo
 
-Se utilizó asistencia de IA para analizar documentación, proponer cambios de código y pruebas, revisar inconsistencias y redactar borradores técnicos. El equipo mantiene la responsabilidad de revisar los cambios, ejecutar las pruebas, verificar las fuentes normativas y decidir qué publicar. El uso de herramientas de IA no se presenta como prueba de exactitud legal ni sustituye la revisión humana de una obligación tributaria.
+Se utilizó **Gemini 3.8 Flash hasta la fase 3** del proyecto y **GPT-6 Sol durante la fase 4** como asistencia para analizar documentación, proponer cambios de código y pruebas, revisar inconsistencias y redactar borradores técnicos. Estos modelos asistieron al equipo en el desarrollo; son distintos del modelo Gemini integrado en la aplicación para generar explicaciones. El equipo mantiene la responsabilidad de revisar los cambios, ejecutar las pruebas, verificar las fuentes normativas y decidir qué publicar. El uso de herramientas de IA no se presenta como prueba de exactitud legal ni sustituye la revisión humana de una obligación tributaria.
 
 ## Datos, límites y verificación
 
 - La explicación puede contener errores o ser genérica cuando actúa la contingencia. Debe contrastarse con el SRI antes de realizar una declaración.
 - El formulario no guarda perfiles en el flujo público actual; el correo se solicita al enviar un recordatorio. Los códigos de verificación se conservan temporalmente en memoria. Los logs aplican anonimización de identificadores en los casos cubiertos por las pruebas.
-- La demostración Render Free usa almacenamiento efímero. No ofrece escaneo periódico fiable ni persistencia de perfiles o cola. Las mejoras locales no se atribuyen a la versión pública anterior hasta desplegar y verificar un nuevo commit.
+- La demostración Render Free usa almacenamiento efímero. No ofrece escaneo periódico fiable ni persistencia de perfiles o cola. Las mejoras se atribuyen a la versión pública solo después de desplegar y verificar el commit correspondiente.
 - Las claves de Gemini y Mailjet se configuran como secretos de entorno. No deben incluirse en el repositorio, capturas, informes ni paquete de entrega.
 
 **Evidencia:** [arquitectura](03-arquitectura.md), [decisiones](09-decisiones.md), [evaluación](07-evaluacion.md), [riesgos](riesgos.md) y [bitácora de semana 4](evidencias/semana-4/bitacora-semana-4.md).

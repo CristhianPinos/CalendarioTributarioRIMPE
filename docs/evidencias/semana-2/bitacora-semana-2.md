@@ -166,3 +166,21 @@
   - 100% adherencia JSON estructurado bajo Pydantic v2.
   - Cumplimiento de la LOPDP (enmascaramiento PII en logs y cabeceras de latencia).
   - Compuerta HITL obligatoria para despacho de notificaciones.
+
+---
+
+## 4. Capturas de pantalla
+
+**MVP construido en funcionamiento.** Estas capturas muestran la interfaz, la explicación de una obligación, la autorización del recordatorio y el simulador en la versión de la semana 2.
+
+![MVP de la semana 2: perfil y calendario](capturas/mvp-calendario.png)
+
+![MVP de la semana 2: explicación de IVA](capturas/mvp-explicacion.png)
+
+![MVP de la semana 2: compuerta de autorización](capturas/mvp-autorizacion.png)
+
+![MVP de la semana 2: simulador de renta](capturas/mvp-simulador.png)
+
+**Estructura de directorios y archivos del proyecto en la semana 2.**
+
+![Estructura del proyecto en la semana 2](capturas/estructura-semana-2.png)

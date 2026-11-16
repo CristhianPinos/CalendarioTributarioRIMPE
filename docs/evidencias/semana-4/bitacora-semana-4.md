@@ -67,3 +67,25 @@ La fuente de esta sección es «Progreso del Proyecto Grupo 11.pdf», entregado 
 | Integraciones externas | Flash Lite produjo una explicación real en Render; el usuario recibió el código y el recordatorio en Gmail. | La disponibilidad futura de Gemini y la entrega futura de Mailjet no quedan garantizadas por una prueba puntual. |
 
 La [evaluación detallada](../../07-evaluacion.md) conserva por separado las mediciones históricas y el [resultado JSON de la versión corregida](../../../eval/resultados_37d3c07_render.json). El despliegue `37d3c07` sustituyó a `414bc44` tras aprobar CI; ambos tienen evidencias vinculadas a su propio SHA.
+
+---
+
+## 4. Capturas de pantalla
+
+**Aplicación ya desplegada funcionado correctamente.** Las capturas muestran la vista inicial, el calendario generado, el modal, la autorización, la aceptación del envío por Mailjet, el correo recibido y el simulador. Son evidencia visual de la demostración; los resultados medidos y sus límites constan en las secciones anteriores. En las capturas de verificación y aceptación del envío se ocultaron el correo y el código temporal antes de incorporarlas al repositorio.
+
+![Aplicación desplegada: vista inicial](capturas/app-inicio.png)
+
+![Aplicación desplegada: calendario y resumen del perfil](capturas/app-calendario.png)
+
+![Aplicación desplegada: verificación de código con datos ocultos](capturas/app-verificacion-codigo-oculto.png)
+
+![Aplicación desplegada: aceptación de Mailjet con correo oculto](capturas/app-envio-mailjet-correo-oculto.png)
+
+![Aplicación desplegada: correo de recordatorio recibido](capturas/app-correo-recordatorio.png)
+
+![Aplicación desplegada: simulador de renta](capturas/app-simulador.png)
+
+**Estructura de directorios y archivos del proyecto en la semana 4.**
+
+![Estructura del proyecto en la semana 4](capturas/estructura-semana-4.png)

@@ -186,3 +186,11 @@ print('Configuracion valida:', data['metadata']['ejercicio_fiscal'])
 1. **Fundamentos sólidos para desarrollo en paralelo:** La formalización de contratos de integración en `HANDOFF.md` y la separación de responsabilidades permitieron que Juan Lucumi (Desarrollador A, Frontend) y Cristhian Pinos (Desarrollador B, Backend) trabajaran de manera independiente sin bloquearse mutuamente.
 2. **Mitigación temprana del riesgo de alucinación:** Al definir en la arquitectura que las fechas se calculan de manera determinista en Python y nunca por inferencia del LLM, se erradicó de raíz la mayor causa de multas e inconformidad tributaria.
 3. **Cumplimiento total de la rúbrica:** La totalidad de los entregables de la Semana 1 fueron completados, estructurados y versionados en el repositorio de manera profesional y auditable.
+
+---
+
+## 5. Capturas de pantalla
+
+**Estructura de directorios y archivos del proyecto en la semana 1.**
+
+![Estructura del proyecto en la semana 1](capturas/estructura-semana-1.png)

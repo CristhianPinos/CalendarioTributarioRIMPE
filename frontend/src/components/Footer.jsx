@@ -33,9 +33,9 @@ export default function Footer() {
               Cuerpos Normativos Oficiales
             </h4>
             <ul className="space-y-1 text-[11px] text-slate-400">
-              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/normativa-tributaria-legislacion-nacional" target="_blank" rel="noreferrer">Ley de Régimen Tributario Interno (LRTI)</a></li>
-              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/normativa-tributaria-legislacion-nacional" target="_blank" rel="noreferrer">Reglamento para la aplicación de la LRTI</a></li>
-              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.registroficial.gob.ec/suplemento-al-registro-oficial-no-461/" target="_blank" rel="noreferrer">Ley Orgánica de Eficiencia Económica y Generación de Empleo (R.O. 461)</a></li>
+              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/12c884d5-c8d9-4171-becc-1513b990b87a/LEY_DE_REGIMEN_TRIBUTARIO_INTERNO_LRTI.pdf" target="_blank" rel="noreferrer">Ley de Régimen Tributario Interno (LRTI)</a></li>
+              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar/7169103f-f014-4bf2-bf24-fb29b34e8d07/REGLAMENTO_PARA_APLICACION_LEY_DE_REGIMEN_TRIBUTARIO_INTERNO.pdf" target="_blank" rel="noreferrer">Reglamento para la aplicación de la LRTI</a></li>
+              <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.asambleanacional.gob.ec/es/system/files/ro-ley_de_eficiencia_economica.pdf" target="_blank" rel="noreferrer">Ley Orgánica de Eficiencia Económica y Generación de Empleo (R.O. 461)</a></li>
               <li>• <a className="hover:text-white underline-offset-2 hover:underline" href="https://www.sri.gob.ec/o/sri-portlet-biblioteca-alfresco-internet/descargar?id=7c3fb8dc-31a6-4fe3-a6c0-abe1def2c78a&amp;nombre=NAC-DGERCGC24-00000027.pdf" target="_blank" rel="noreferrer">Resolución NAC-DGERCGC24-00000027 (normas de aplicación del RIMPE)</a></li>
             </ul>
           </div>
