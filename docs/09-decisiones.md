@@ -246,8 +246,8 @@ El agente tiene máximo de iteraciones y la ruta comparte la cuota generativa, r
 
 ## ADR-013: Escaneo diario general sin perfiles persistidos
 
-**Fecha:** Noviembre de 2026. **Estado:** Implementado en código; activación programada sujeta a configurar el secreto compartido.
+**Fecha:** Noviembre de 2026. **Estado:** Implementado y verificado con una ejecución manual en Render; ejecución diaria programada, aún no observada en su horario.
 
 El escaneo histórico conserva RUC, nombre, correo y una cola individual; no es compatible con la demostración pública sin perfiles guardados. Se separó el cálculo de fechas por noveno dígito del RUC completo y se prepara una matriz general de 40 combinaciones de dígito, régimen y actividades excluidas. Solo se retienen alertas sin identidad durante la vida del proceso. La API consulta una combinación tras generar el perfil en la sesión. La notificación abre el modal existente y nunca despacha correo sin verificación y consentimiento.
 
-GitHub Actions dispara una revisión diaria mediante un endpoint protegido por `SCAN_TRIGGER_TOKEN`. Render Free puede suspenderse y GitHub puede retrasar el trabajo; una consulta reconstruye la matriz si cambió el día o se perdió la memoria. Esto no equivale a avisos individuales mientras el usuario está ausente. El planificador histórico sigue desactivado. El escaneo usa exclusivamente el ejercicio normativo configurado y no extrapola a otro ejercicio.
+GitHub Actions dispara una revisión diaria mediante un endpoint protegido por `SCAN_TRIGGER_TOKEN`. Una [ejecución manual](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43833355286) comprobó 40 combinaciones sin enviar mensajes. Render Free puede suspenderse y GitHub puede retrasar el trabajo; una consulta reconstruye la matriz si cambió el día o se perdió la memoria. Esto no equivale a avisos individuales mientras el usuario está ausente. El planificador histórico sigue desactivado. El escaneo usa exclusivamente el ejercicio normativo configurado y no extrapola a otro ejercicio.
