@@ -21,6 +21,8 @@ flowchart LR
     API --> CALC[Reglas y cálculo Python]
     API --> RAG[BM25 sobre siete PDF]
     API --> IA[Gemini o catálogo de contingencia]
+    GH[GitHub Actions: escaneo diario general] -->|Token secreto| API
+    API --> ALERT[Alertas sin identidad en memoria]
     UI --> OTP[Código al correo elegido]
     OTP --> HITL[Confirmación humana]
     HITL --> MJ[Mailjet API HTTPS]
@@ -30,6 +32,7 @@ flowchart LR
 - `POST /api/obligaciones/explicar` combina datos tributarios calculados, contexto normativo y Gemini cuando responde. Si falla o no hay clave, entrega el catálogo determinista con el origen identificado. El simulador también delega montos a Python.
 - Las rutas `/api/correo` envían un código temporal al destinatario y requieren su verificación y confirmación expresa para el recordatorio puntual. Mailjet usa HTTPS. `ENVIADO` indica aceptación del proveedor; entrega y lectura son estados distintos.
 - `POST /api/agente/ejecutar` permite seleccionar herramientas con Gemini dentro de la lista que Python valida, pero no despacha correo. El recorrido de envío verificado usa orden seguro. Las rutas históricas de perfiles y cola no están montadas, y `backend/main.py` no inicia el planificador, incluso si existe configuración del cron. Render Free no conserva datos locales tras reinicios.
+- GitHub Actions solicita `POST /api/calendario/alertas/escanear` con un token secreto. El backend calcula 40 combinaciones generales de noveno dígito, régimen y actividades excluidas, sin RUC, nombre ni correo. La consulta normal recupera las alertas de la combinación de la sesión y reconstruye la matriz cuando corresponde. Este escaneo no envía recordatorios automáticamente.
 - El contenedor compila React y FastAPI sirve los archivos estáticos y la API desde un origen. Las claves de Gemini y Mailjet son variables de entorno del servidor; el middleware registra rutas sin identificadores personales. Los detalles de operación se encuentran en el [README](../README.md) y en [automatización](10-automatizacion.md).
 
 ---

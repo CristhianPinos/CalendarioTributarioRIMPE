@@ -18,6 +18,7 @@ Este documento recopila las Decisiones de Arquitectura de Software (**Architectu
 - [ADR-010: Envío puntual verificado sin operador ni perfil persistido](#adr-010-envío-puntual-verificado-sin-operador-ni-perfil-persistido)
 - [ADR-011: Transporte de correo por API HTTPS de Mailjet](#adr-011-transporte-de-correo-por-api-https-de-mailjet)
 - [ADR-012: Selección acotada de herramientas por Gemini](#adr-012-selección-acotada-de-herramientas-por-gemini)
+- [ADR-013: Escaneo diario general sin perfiles persistidos](#adr-013-escaneo-diario-general-sin-perfiles-persistidos)
 
 ---
 
@@ -31,17 +32,17 @@ Este documento recopila las Decisiones de Arquitectura de Software (**Architectu
 El caso de estudio exige generar explicaciones pedagógicas de obligaciones tributarias para microemprendedores basadas en la normativa del SRI. Durante la fase inicial se contemplaron alternativas como OpenAI (`gpt-4o-mini`). Sin embargo, se identificó la necesidad de optimizar costos, reducir latencias, contar con soporte nativo de esquemas JSON estructurados (`responseSchema`) y unificar el stack del equipo con una sola clave provista institucionalmente por Google AI Studio.
 
 ### Decisión
-Se seleccionó exclusivamente la familia **Google Gemini Flash** (`gemini-3-flash-preview` / `gemini-3.8-flash`) como el único proveedor de inferencia generativa del sistema. Se eliminó de raíz cualquier dependencia de OpenAI (`openai`, `OPENAI_API_KEY`, referencias a GPT) en el código fuente, pruebas, configuraciones y documentación.
+Se seleccionó la familia **Google Gemini Flash** (`gemini-3-flash-preview` / `gemini-3.8-flash`) como proveedor de inferencia generativa de la aplicación. No se usa la API de OpenAI en el flujo de ejecución. Esta decisión no se refiere a los asistentes utilizados para desarrollar el proyecto: la [declaración de uso de IA](declaracion-uso-ia.md) registra Gemini 3.8 Flash hasta la fase 3 y GPT-6 Sol durante la fase 4.
 
 **Actualización de fase 4:** el proveedor sigue siendo Gemini, pero el modelo predeterminado pasó a `gemini-3.5-flash-lite` tras observar errores 429/503 del modelo anterior. La aplicación mantiene el catálogo determinista cuando el proveedor falla; véase [evaluación](07-evaluacion.md).
 
 ### Consecuencias
 * **Positivas:** 
-  - Latencia promedio de inferencia inferior a 1,500 ms con tokens suficientes para citas normativas extensas.
-  - Generación estructurada nativa garantizando 100% de compatibilidad con esquemas Pydantic v2.
-  - Cero costos operativos en entorno de desarrollo académico mediante el tier gratuito de Google AI Studio.
+  - La comparación inicial observó latencia baja en los casos medidos; no establece un tiempo garantizado para todas las solicitudes.
+  - El proveedor admite salidas estructuradas; el backend valida cada respuesta con Pydantic v2.
+  - El nivel gratuito permitió las pruebas académicas registradas, sujeto a la cuota vigente del proveedor.
 * **Negativas / Desafíos:**
-  - El tier gratuito está sujeto a límites de cuota (15 RPM / 1M TPM), lo cual obligó a implementar el mecanismo de resiliencia del [ADR-003](#adr-003-resiliencia-con-tenacity-y-fallback-determinista-oficial-sri).
+  - El nivel gratuito está sujeto a cuotas que cambian por modelo y proyecto; los errores 429 observados motivaron el mecanismo de resiliencia del [ADR-003](#adr-003-resiliencia-con-tenacity-y-fallback-determinista-oficial-sri).
 
 ---
 
@@ -77,8 +78,8 @@ Las APIs de modelos generativos están expuestas a saturación transitoria de cu
 
 ### Decisión
 Se implementó una política de resiliencia de dos niveles en [`backend/services/llm.py`](../backend/services/llm.py):
-1. **Nivel 1 - Reintentos Exponenciales con Tenacity:** Ante errores HTTP 429, HTTP 503 o timeouts de red, se ejecutan hasta **3 reintentos automáticos** con retroceso exponencial (`1s, 2s, 4s`).
-2. **Nivel 2 - Fail-Safe / Fallback Determinista Oficial:** Si tras los 3 reintentos la API externa no responde o el entorno se encuentra completamente sin conexión a internet, el sistema activa automáticamente un catálogo de contingencia oficial preconstruido con base en las Resoluciones SRI NAC-24-0027, NAC-23-0034 y la LRTI, entregando la explicación pedagógica y cita legal con HTTP 200 y cero tiempo de inactividad.
+1. **Nivel 1 - Reintentos Exponenciales con Tenacity:** Ante errores HTTP 429, HTTP 503 o timeouts de red, se realizan hasta **3 intentos en total** (una solicitud inicial y como máximo dos reintentos), con espera exponencial acotada.
+2. **Nivel 2 - Fail-Safe / Fallback Determinista Oficial:** Si los intentos no obtienen respuesta útil, el sistema recurre a un catálogo de contingencia construido con normativa tributaria. En los casos probados devolvió una explicación y su referencia con HTTP 200; la contingencia no elimina la latencia ni garantiza disponibilidad continua.
 
 ### Consecuencias
 * **Positivas:** El catálogo de contingencia permite responder a determinadas fallas del proveedor generativo; las pruebas automatizadas verifican ese flujo en los casos cubiertos. No demuestra disponibilidad continua del servicio completo.
@@ -152,11 +153,11 @@ Todos los parámetros tributarios se extrajeron a [`config/sri_rules_2026.json`]
 
 ### Contexto
 
-La hoja de ruta pide Render Free. La etapa 5 trasladó perfiles y cola a SQLite para preservar consentimiento y estados. [Render documenta](https://render.com/docs/free) que el sistema de archivos del plan Free se pierde al reiniciar, redesplegar o suspender el servicio; además, lo suspende tras un período de inactividad. Un despliegue Free con registro de contribuyentes daría una falsa expectativa de persistencia y no ejecutaría de forma fiable el escaneo diario.
+La hoja de ruta pide Render Free. La implementación histórica trasladó perfiles y cola a SQLite para preservar consentimiento y estados. [Render documenta](https://render.com/docs/free) que el sistema de archivos del plan Free se pierde al reiniciar, redesplegar o suspender el servicio; además, lo suspende tras un período de inactividad. Un despliegue Free con registro de contribuyentes daría una falsa expectativa de persistencia y no ejecutaría de forma fiable el planificador individual.
 
 ### Decisión
 
-Se ofrece una demostración pública **sin perfiles persistentes ni escaneo periódico**: `render.yaml` configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`. El envío puntual sí está disponible mediante verificación del correo y confirmación humana (ADR-010), con Mailjet por HTTPS (ADR-011); las claves se guardan solo en el entorno del servicio. El cálculo tributario continúa en Python, el índice RAG se empaqueta en la imagen y Gemini sigue encargado de las explicaciones cuando exista una clave configurada. Frontend y API se sirven desde un solo origen en el contenedor. `Dockerfile` usa un usuario sin privilegios y no copia el archivo `.env` ni la cola JSON histórica.
+Se ofrece una demostración pública **sin perfiles persistentes ni planificador individual de correos**: `render.yaml` configura `RIMPE_DEMO_READONLY=true` y `SCHEDULER_ENABLED=false`. El escaneo diario general sin identidad se describe por separado en el [ADR-013](#adr-013-escaneo-diario-general-sin-perfiles-persistidos). El envío puntual sí está disponible mediante verificación del correo y confirmación humana (ADR-010), con Mailjet por HTTPS (ADR-011); las claves se guardan solo en el entorno del servicio. El cálculo tributario continúa en Python, el índice RAG se empaqueta en la imagen y Gemini sigue encargado de las explicaciones cuando existe una clave configurada. Frontend y API se sirven desde un solo origen en el contenedor. `Dockerfile` usa un usuario sin privilegios y no copia el archivo `.env` ni la cola JSON histórica.
 
 Para operar recordatorios periódicos con datos personales se necesitaría almacenamiento duradero, una sola instancia del planificador y un nuevo diseño de consentimiento y autorización antes de volver a montar las rutas históricas. Un [disco persistente](https://render.com/docs/disks) sería parte de esa infraestructura. Esa opción no forma parte de la demostración Free autorizada.
 
@@ -169,13 +170,13 @@ Para operar recordatorios periódicos con datos personales se necesitaría almac
 
 ### Decisiones éticas relacionadas
 
-La minimización de datos de la etapa 3 y la aprobación HITL de la etapa 1 se aplican a cualquier despliegue persistente. Las consultas de evasión se rechazan por la compuerta del RAG con cita del Código Tributario. Estas medidas son controles verificables del software; no sustituyen una revisión jurídica ni una auditoría independiente.
+La minimización de datos y la aprobación HITL se aplican a cualquier despliegue persistente. Las consultas de evasión se rechazan por la compuerta del RAG con cita del Código Tributario. Estas medidas son controles verificables del software; no sustituyen una revisión jurídica ni una auditoría independiente.
 
 ---
 
 ## ADR-008: Minimización de datos y consentimiento para recordatorios
 
-**Fecha:** Noviembre de 2026. **Estado:** Decisión histórica de la etapa 5; reemplazada para la aplicación pública por ADR-010.
+**Fecha:** Noviembre de 2026. **Estado:** Decisión histórica del diseño con persistencia; reemplazada para la aplicación pública por ADR-010.
 
 ### Contexto
 
@@ -190,7 +191,7 @@ El cálculo del calendario necesita un RUC y parámetros tributarios, pero no re
 
 ### Consecuencias y evidencia
 
-La demostración permite consultas sin crear registros de perfiles. Esta decisión describe el flujo persistente histórico de la etapa 5, que quedó inactivo por ADR-010. El enmascaramiento de logs no cifra una base; si se reactiva la persistencia, deberá protegerse el volumen y los respaldos. Las pruebas actuales de almacenamiento, verificación de correo y privacidad están en [`backend/tests/test_storage.py`](../backend/tests/test_storage.py), [`backend/tests/test_correo_verificado.py`](../backend/tests/test_correo_verificado.py) y [`backend/tests/test_privacy_boundaries.py`](../backend/tests/test_privacy_boundaries.py).
+La demostración permite consultas sin crear registros de perfiles. Esta decisión describe el flujo persistente histórico, que quedó inactivo por ADR-010. El enmascaramiento de logs no cifra una base; si se reactiva la persistencia, deberá protegerse el volumen y los respaldos. Las pruebas actuales de almacenamiento, verificación de correo y privacidad están en [`backend/tests/test_storage.py`](../backend/tests/test_storage.py), [`backend/tests/test_correo_verificado.py`](../backend/tests/test_correo_verificado.py) y [`backend/tests/test_privacy_boundaries.py`](../backend/tests/test_privacy_boundaries.py).
 
 ---
 
@@ -246,7 +247,7 @@ El agente tiene máximo de iteraciones y la ruta comparte la cuota generativa, r
 
 ## ADR-013: Escaneo diario general sin perfiles persistidos
 
-**Fecha:** Noviembre de 2026. **Estado:** Implementado y verificado con una ejecución manual en Render; ejecución diaria programada, aún no observada en su horario.
+**Fecha:** Noviembre de 2026. **Estado:** Implementado; el disparo manual se verificó en Render. La evidencia registrada no mide la puntualidad de las ejecuciones por horario.
 
 El escaneo histórico conserva RUC, nombre, correo y una cola individual; no es compatible con la demostración pública sin perfiles guardados. Se separó el cálculo de fechas por noveno dígito del RUC completo y se prepara una matriz general de 40 combinaciones de dígito, régimen y actividades excluidas. Solo se retienen alertas sin identidad durante la vida del proceso. La API consulta una combinación tras generar el perfil en la sesión. La notificación abre el modal existente y nunca despacha correo sin verificación y consentimiento.
 

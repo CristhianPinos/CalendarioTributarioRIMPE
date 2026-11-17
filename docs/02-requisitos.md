@@ -1,6 +1,6 @@
 # Especificación de Requisitos y Modelo de Datos
 
-> **Línea base histórica de fase 1.** Los requisitos de perfil con correo, autorización de operador, cola persistente, SMTP y escaneo periódico no describen el flujo público actual. El calendario utiliza un perfil de sesión sin correo guardado; el recordatorio puntual verifica el destinatario con un código y se envía por Mailjet HTTPS tras confirmación humana. La implementación histórica de persistencia y planificador sigue sin rutas montadas. Véanse [arquitectura vigente](03-arquitectura.md#arquitectura-vigente) y [ADR-010/011](09-decisiones.md).
+> **Línea base histórica de fase 1.** Los requisitos de perfil con correo, autorización de operador, cola persistente, SMTP y escaneo individual periódico no describen el flujo público actual. El calendario utiliza un perfil de sesión sin correo guardado; el recordatorio puntual verifica el destinatario con un código y se envía por Mailjet HTTPS tras confirmación humana. La implementación histórica de persistencia y planificador sigue sin rutas montadas. Existe un escaneo diario general sin datos personales, ejecutado mediante GitHub Actions, que no envía correos. Las fechas históricas de renta para Emprendedor persona natural se corrigieron a mayo en la regla vigente. Véanse [arquitectura vigente](03-arquitectura.md#arquitectura-vigente) y [ADR-010/011/013](09-decisiones.md).
 
 | Metadato | Detalle |
 | :--- | :--- |

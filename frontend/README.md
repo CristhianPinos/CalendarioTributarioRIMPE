@@ -1,16 +1,16 @@
-# React + Vite
+# Interfaz del Calendario Tributario RIMPE
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+SPA en React 18 y Vite. El formulario recoge el perfil del contribuyente durante la sesión; FullCalendar muestra los vencimientos calculados por el backend. El modal de cada obligación presenta la explicación normativa y permite revisar un recordatorio, verificar el correo elegido y autorizar su envío. El simulador de renta consulta el cálculo de Python.
 
-Currently, two official plugins are available:
+## Desarrollo local
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Con el backend disponible en `http://localhost:8000`:
 
-## React Compiler
+```powershell
+npm ci
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Vite sirve la interfaz en `http://localhost:5173` y redirige `/api` y `/health` al backend local. Los otros comandos son `npm run build` para compilar, `npm run lint` para revisar el código y `npm run preview` para examinar la compilación. En el despliegue, FastAPI sirve los archivos compilados junto con la API desde el mismo origen.
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Véase el [README principal](../README.md) para la configuración del proyecto completo, Docker, despliegue y pruebas.

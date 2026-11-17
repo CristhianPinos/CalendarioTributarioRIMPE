@@ -3,6 +3,7 @@
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE  
 **Fase 2:** Construcción del MVP e integración con IA generativa (Semana 2)  
 **Modelo de inferencia de la comparación histórica:** Google Gemini Flash (`gemini-3-flash-preview` / `gemini-3.8-flash`). El despliegue verificado de fase 4 usa `gemini-3.5-flash-lite` y conserva contingencia determinista.
+**Alcance de las fechas del benchmark:** los casos y resultados siguientes son históricos. La fecha de marzo usada en el caso 7 no representa el calendario vigente: la renta de Emprendedor persona natural se corrigió a mayo en las reglas actuales.
 **Esquema de Validación:** `RecordatorioEstructurado` (Pydantic v2)  
 
 ---

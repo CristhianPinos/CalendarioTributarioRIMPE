@@ -1,6 +1,6 @@
 # Documento de Diseño: Flujo Automatizado y Programado (Semana 3)
 
-> **Estado al cierre de fase 4:** este documento conserva el diseño histórico de la semana 3. Las rutas `/api/perfiles` y `/api/flujo` y el planificador no se montan en la aplicación actual, local ni pública. El flujo activo es el envío puntual con código temporal y confirmación; no requiere operador, no guarda perfiles tributarios y usa Mailjet HTTPS en lugar de SMTP. Los diagramas y estados SMTP de abajo corresponden solo al código histórico. Véanse [ADR-010 y ADR-011](09-decisiones.md).
+> **Estado al cierre de fase 4:** este documento conserva el diseño histórico de la semana 3 y describe al final el [escaneo general vigente](#5-escaneo-diario-general-vigente). Las rutas `/api/perfiles` y `/api/flujo` y el planificador individual no se montan en la aplicación actual, local ni pública. El envío puntual usa código temporal y confirmación; no requiere operador, no guarda perfiles tributarios y usa Mailjet HTTPS en lugar de SMTP. Los diagramas y estados SMTP de abajo corresponden solo al código histórico. Véanse [ADR-010, ADR-011 y ADR-013](09-decisiones.md).
 
 **Proyecto:** Calendario Tributario Personalizado con Recordatorios para Emprendedores RIMPE  
 **Módulo:** Automatización de Tareas Diarias y Notificaciones Programadas (`backend/services/scheduler.py`)  
@@ -15,7 +15,7 @@ El disparador es interno a un proceso: habilitarlo en una sola instancia para ev
 
 **Registro del diseño histórico:** `perfiles_router.py` implementa alta y consulta de perfiles para una instalación persistente, pero esas rutas no están expuestas por la aplicación actual. El formulario público no ofrece registro y generar el calendario no guarda datos. La reactivación del registro y del escaneo requeriría volver a definir consentimiento, autorización y almacenamiento duradero.
 
-**Interfaz de despacho histórica:** La etapa 5 exigía autorización de operador y consentimiento persistido. ADR-010 sustituyó este flujo: el modal actual solicita un código temporal al correo elegido, exige confirmación explícita y despacha un recordatorio puntual sin registrar un perfil. ADR-011 sustituyó el transporte SMTP del flujo puntual por la API HTTPS de Mailjet.
+**Interfaz de despacho histórica:** El diseño con persistencia exigía autorización de operador y consentimiento guardado. ADR-010 sustituyó este flujo: el modal actual solicita un código temporal al correo elegido, exige confirmación explícita y despacha un recordatorio puntual sin registrar un perfil. ADR-011 sustituyó el transporte SMTP del flujo puntual por la API HTTPS de Mailjet.
 
 ---
 
@@ -87,10 +87,20 @@ El objetivo del flujo automatizado es escanear periódicamente la base de contri
 
 ---
 
-## 4. Endpoints Expuestos en la API
+## 4. Endpoints del diseño histórico, no expuestos en la aplicación actual
+
+Las rutas siguientes pertenecen a `flujo_router.py`. `backend/main.py` no monta ese router en la aplicación local ni en la demo pública. El escaneo general diario vigente utiliza `/api/calendario/alertas/escanear` y no registra perfiles ni envía correos.
 
 - `POST /api/flujo/ejecutar-tarea-diaria`: Ejecuta el escaneo y prepara la cola de recordatorios.
 - `GET /api/flujo/recordatorios-pendientes`: Lista los recordatorios pendientes de confirmación con su fundamentación RAG.
 - `POST /api/flujo/confirmar-recordatorio/{id}`: Aprueba y despacha un recordatorio específico.
 - `POST /api/flujo/confirmar-todos`: Aprueba en lote los recordatorios revisados por el supervisor.
 - `GET /api/flujo/recordatorios-en-revision`: Muestra `ESTADO_INCIERTO` y `EN_PROCESO` para verificación manual.
+
+---
+
+## 5. Escaneo diario general vigente
+
+El [workflow de GitHub Actions](../.github/workflows/daily-alert-scan.yml) solicita diariamente a las 07:17 de Ecuador continental `POST /api/calendario/alertas/escanear`. El endpoint exige el mismo `SCAN_TRIGGER_TOKEN` configurado como secreto en Actions y en Render. El escaneo evalúa 40 combinaciones de noveno dígito, régimen y actividades excluidas, sin leer ni guardar RUC completos, nombres ni correos. No prepara una cola personal ni despacha mensajes.
+
+La interfaz consulta `GET /api/calendario/alertas` para la combinación del perfil introducido durante la sesión. Si Render Free reinicia o cambia el día, el backend reconstruye las alertas generales al recibir la consulta. La [ejecución manual registrada](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43833355286) terminó correctamente; esa prueba acredita el disparador y el cálculo, no la puntualidad futura del horario ni un aviso fuera de la sesión. Véanse [ADR-013](09-decisiones.md#adr-013-escaneo-diario-general-sin-perfiles-persistidos) y las [pruebas](08-pruebas.md).

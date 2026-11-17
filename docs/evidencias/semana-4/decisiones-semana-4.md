@@ -8,7 +8,7 @@
 
 **Integrantes:** Juan Lucumi (Desarrollador A) y Cristhian Pinos (Desarrollador B)
 
-**Estado:** Demostración y CI verificados; entrega formal pendiente.
+**Estado:** Documentación, demostración y CI verificados; la presentación del paquete de entrega corresponde al equipo.
 
 ---
 
@@ -18,7 +18,7 @@ La [bitácora](bitacora-semana-4.md#2-observaciones-de-la-revisión-y-respuesta-
 
 ### Render Free como demostración
 
-El responsable del proyecto eligió Render Free solo para demostración tras revisar que el plan pierde archivos locales al suspenderse o reiniciarse. `RIMPE_DEMO_READONLY=true` bloquea el alta de perfiles y `SCHEDULER_ENABLED=false` evita prometer recordatorios periódicos que no sobrevivirían a un reinicio. [ADR-007](../../09-decisiones.md) conserva la justificación técnica.
+El responsable del proyecto eligió Render Free solo para demostración tras revisar que el plan pierde archivos locales al suspenderse o reiniciarse. `RIMPE_DEMO_READONLY=true` bloquea el alta de perfiles y `SCHEDULER_ENABLED=false` impide activar el planificador histórico de recordatorios individuales. El escaneo diario general sin perfiles se ejecuta por [GitHub Actions](../../09-decisiones.md#adr-013-escaneo-diario-general-sin-perfiles-persistidos) y no despacha correos por sí mismo. [ADR-007](../../09-decisiones.md) conserva la justificación técnica del despliegue.
 
 ### Un origen para frontend y API
 
@@ -30,7 +30,7 @@ Las mediciones locales se publican como **locales**. La URL y los resultados de 
 
 ### Minimización de datos y rechazo de consultas de evasión
 
-Las decisiones éticas se describen en [ADR-008 a ADR-012](../../09-decisiones.md). El calendario se calcula sin guardar un perfil; el envío puntual requiere un código recibido en el correo elegido y confirmación expresa. El registro administrativo y el escaneo periódico son parte del diseño histórico, sin rutas montadas en la aplicación actual. El RAG se abstiene ante solicitudes de evasión o falta de sustento. Las pruebas cubren casos concretos, sin presentar esos controles como garantías absolutas.
+Las decisiones éticas se describen en [ADR-008 a ADR-013](../../09-decisiones.md). El calendario se calcula sin guardar un perfil; el envío puntual requiere un código recibido en el correo elegido y confirmación expresa. El registro administrativo y el escaneo periódico **individual con cola persistente** son parte del diseño histórico, sin rutas montadas en la aplicación actual. El escaneo general diario trabaja con combinaciones sin identidad. El RAG se abstiene ante solicitudes de evasión o falta de sustento. Las pruebas cubren casos concretos, sin presentar esos controles como garantías absolutas.
 
 ### Selección acotada de herramientas
 
@@ -52,4 +52,4 @@ Ante respuestas 429/503 de Gemini se conserva el catálogo determinista y se inf
 
 ## 2. Estado de las Decisiones en el Despliegue
 
-La primera demostración se verificó con el commit `84cc378`. La versión candidata posterior se comprobó con el commit `414bc44`: `/health` informó ese SHA antes y después de 18/18 casos HTTP y de la evaluación pública; la [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) aprobó sus controles. La corrección `37d3c07` también pasó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462), 18/18 casos HTTP y [evaluación pública](../../07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02) sobre el mismo SHA. El usuario confirmó la recepción del código y del recordatorio del flujo puntual en la versión anterior; no se repitió esa prueba externa tras el nuevo despliegue. El registro de perfiles y el escaneo periódico siguen desactivados en Render Free. La [bitácora](bitacora-semana-4.md) y los informes enlazados conservan los resultados y sus límites.
+La primera demostración se verificó con el commit `84cc378`. La versión candidata posterior se comprobó con el commit `414bc44`: `/health` informó ese SHA antes y después de 18/18 casos HTTP y de la evaluación pública; la [corrida de CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43366345513) aprobó sus controles. La corrección `37d3c07` también pasó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43518880462), 18/18 casos HTTP y [evaluación pública](../../07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02) sobre el mismo SHA. El usuario confirmó la recepción del código y del recordatorio del flujo puntual; una [demostración posterior](bitacora-semana-4.md#4-capturas-de-pantalla) mostró la vista previa revisada, la verificación del destinatario, la aceptación de Mailjet y el correo recibido. La aceptación de Mailjet no demuestra por sí sola la entrega. El registro de perfiles y el planificador histórico de recordatorios individuales siguen desactivados en Render Free; el escaneo diario general se comprobó por separado. La [bitácora](bitacora-semana-4.md) y los informes enlazados conservan los resultados y sus límites.

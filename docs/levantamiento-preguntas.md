@@ -1,5 +1,7 @@
 # Levantamiento de Información de Campo: Preguntas Frecuentes y Entrevistas a Contribuyentes RIMPE
 
+> **Registro histórico de fase 1.** Las preguntas y propuestas de esta etapa documentan el levantamiento inicial, no la configuración actual del servicio. El [README](../README.md) y la [arquitectura vigente](03-arquitectura.md#arquitectura-vigente) describen el flujo final, incluidos Mailjet, el perfil de sesión y el escaneo general sin datos personales.
+
 | Metadato | Detalle |
 | :--- | :--- |
 | **Documento** | Levantamiento Real de Requerimientos y Casos de Uso |

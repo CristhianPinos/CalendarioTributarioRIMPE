@@ -2,7 +2,7 @@
 
 Aplicación académica del Caso 11, Grupo 11, UNIANDES. Genera un calendario para contribuyentes RIMPE de Ecuador, explica obligaciones con Gemini y documentos normativos, y prepara recordatorios sujetos a consentimiento y aprobación humana.
 
-**Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). La versión [`ce504e1`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/ce504e1ea91977296b58f803d51ead294b6432cf) está desplegada y pasó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43838251508). El [escaneo manual anterior](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43833355286) terminó correctamente. Las [18/18 pruebas HTTP](docs/08-pruebas.md#verificación-del-despliegue-con-la-corrección-rag) y la [evaluación pública anterior](docs/07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02) corresponden a commits anteriores. La demo no guarda perfiles; el envío puntual usa código y Mailjet.
+**Demostración pública:** [calendario-rimpe-g11-demo.onrender.com](https://calendario-rimpe-g11-demo.onrender.com/) (Render Free). El 16 de noviembre de 2026, `/health` identificó la versión `3.3.0` y el commit desplegado [`46546c7`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/46546c78f6dc654f7d4a504f4ee1edd66e5f30d9), con reglas y fragmentos RAG disponibles. La [prueba de recuperación del índice tras reinicio](docs/08-pruebas.md#recuperación-del-índice-rag-después-de-reiniciar-el-contenedor) pasó en CI para el commit anterior `5c347a2`. Las [18/18 pruebas HTTP públicas](docs/08-pruebas.md#verificación-del-despliegue-con-la-corrección-rag), la [evaluación RAG pública](docs/07-evaluacion.md#12-verificación-pública-de-la-corrección-preg-02) y el [escaneo general manual](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43833355286) corresponden a ejecuciones y commits distintos, documentados por separado. La demo no guarda perfiles; el envío puntual usa código y Mailjet.
 
 El ajuste visual posterior [`30fab35`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/30fab3593f5c352da9a653f40adf536895dfc0f4) pasó [CI](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/actions/runs/43521418406) y se revisó en la URL pública en escritorio, tableta y móviles de 390 y 320 px. Véase la [comprobación visual](docs/08-pruebas.md#comprobación-visual-del-despliegue-responsive).
 
@@ -117,7 +117,7 @@ Gemini se usa para redactar explicaciones pedagógicas. Python conserva la autor
 | Integrante | Aportes verificables en el historial Git |
 | --- | --- |
 | Cristhian Pinos | Fundamentos y arquitectura; backend tributario y Gemini; pipeline RAG, agente, evaluación y CI (`77adf34`, `adcb736`, `ffb9c3e`, `50b09db`). |
-| Juan Lucumi | SPA React y calendario; refactor con `Decimal`, integración SMTP y formulario paso a paso (`c7cec18`, `31cdbed`). |
+| Juan Lucumi | SPA React y calendario; refactor con `Decimal`, integración SMTP histórica y formulario paso a paso (`c7cec18`, `31cdbed`). El envío público actual usa Mailjet. |
 
 La tabla atribuye únicamente aportes respaldados por commits. Los controles de seguridad y persistencia y el empaquetado inicial de la fase 4 figuran en el commit [`84cc378`](https://github.com/CristhianPinos/CalendarioTributarioRIMPE/commit/84cc378bac8fc1322818c24451b54f78bde86e02) de Cristhian Pinos. Las comprobaciones posteriores de CI y Render se documentan con sus propios commits y resultados.
 
